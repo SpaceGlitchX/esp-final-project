@@ -18,4 +18,4 @@ void heater_manager_set_output(void);
 void heater_manager_start_ignition(void);
 void heater_manager_process_event(state_t *current_state, in *attempts,uint32_t *fan_timer_ms);
 
-#endif HEATER_MANAGER_H
+#endif
