@@ -6,7 +6,7 @@
 typedef enum {
     STATE_OFF,
     STATE_ON,
-    STATE_WAIT_FOR_HEATER,
+    STATE_IDLE,
     STATE_FAULT
 } state_t;
 

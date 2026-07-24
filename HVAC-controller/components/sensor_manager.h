@@ -20,5 +20,4 @@ float sensor_manager_read_temperature(void);
 
 uint32_t sensor_manager_get_fan_rpm(void);
 
-
 #endif

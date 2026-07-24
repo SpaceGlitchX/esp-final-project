@@ -8,7 +8,7 @@
 typedef enum {
     STATE_OFF,
     STATE_IGNITING,
-    STATE_WAIT_FOR_FAN.
+    STATE_WAIT_FOR_FAN,
     STATE_RUNNING,
     STATE_FAULT
 } state_t;
