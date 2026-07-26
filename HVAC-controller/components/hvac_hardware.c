@@ -47,3 +47,10 @@ void init_hvac_hardware(void) {
     fan_warmup_timer = xTimerCreate("WarmupTimer", pdMS_TO_TICKS(10000), pdFALSE, NULL, warmup_done_callback);
     tach_window_timer = xTimerCreate("TachTimeout", pdMS_TO_TICKS(1000), pdFALSE, NULL, tach_timeout_callback);
 }
+
+void set_heater_state(int level) {
+    gpio_set_level(HEATER_PIN, level);
+}
+void set_fan_state(int level) {
+    gpio_set_level(FAN_PIN, level);
+}
