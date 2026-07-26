@@ -14,5 +14,6 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=/home/escapegoat/esp-final-project/HVAC-controller/build"
-  ]
+  ],
+  "C_Cpp.errorSquiggles": "disabled"
 }
