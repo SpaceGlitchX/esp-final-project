@@ -29,5 +29,6 @@ void init_sensors(void) {
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, ANALOG_FLAME_CHANNEL))
 }
 
-void
+void start_flame_proving_monitor(void) {
+    xTimerStart(analog_sample_timer, 0);
 }
