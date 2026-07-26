@@ -3,5 +3,4 @@
 #include "hvac_states.h"
 
 void hvac_state_machine_task(void *pvParameters);
-
 #endif

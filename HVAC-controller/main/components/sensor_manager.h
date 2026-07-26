@@ -15,7 +15,7 @@
 #define TEMP_SENSE_PIN 4
 
 // ADC and timer handles
-extern adc_oneshot_unit_handle_t adc_handle;
+extern adc_oneshot_unit_handle_t adc1_handle;
 extern TimerHandle_t analog_sample_timer;
 extern TimerHandle_t temp_sample_timer;
 

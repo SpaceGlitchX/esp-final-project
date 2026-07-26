@@ -1,8 +1,13 @@
 #include "hvac_state_machine.h"
 #include "sensor_manager.h"
 #include "hvac_hardware.h"
+#include "hvac_states.h"
 
 static hvac_state_t current_state = STATE_IDLE;
+
+static update_state(hvac_state_t state) {
+    current_state = state;
+}
 
 void hvac_state_machine_task(void *pvParameters) {
     hvac_cmd_t event;
@@ -17,13 +22,17 @@ void hvac_state_machine_task(void *pvParameters) {
                         set_heater_state(1);
                         xTimerStart(flame_proving_timer, 0);
                         start_flame_proving_monitor();
-                        current_state = STATE_INGINITION;
+                        update_state(STATE_IGNITION);
                     } else if (event == CMD_FAN_ONLY) {
                         set_fan_state(1);
-                        current_state = STATE_FAN_CIRCULATE;
+                        update_state(STATE_FAN_CIRCULATE);
                     }
                     break;
                 case STATE_FAN_CIRCULATE:
+                    if (event == CMD_OFF) {
+                        set_fan_state(0);
+                        update_state(STATE_IDLE);
+                    }
                     break;
                 case STATE_IGNITION:
                     break;

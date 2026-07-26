@@ -1,5 +1,5 @@
 #include "hvac_hardware.h"
-#include "driver.gpio.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
 
 /**
@@ -37,7 +37,7 @@ void init_hvac_hardware(void) {
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_ENABLE
     };
-    gpio(&io_config);
+    gpio_config(&io_config);
 
     set_fan_state(0);
     set_heater_state(0);
