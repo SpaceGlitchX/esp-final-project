@@ -3,10 +3,11 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
+#include "esp_adc/adc_oneshot.h"
 #include <stdint.h>
 
 // Hardware pin configuration
-#define FLAME_ADC_CHANNEL ADC_CHANNEL_6 // GPIO 34
+#define ANALOG_FLAME_CHANNEL ADC_CHANNEL_6 // GPIO 34
 #define FLAME_THRESHOLD 500
 
 #define FAN_TACH_PIN 16
