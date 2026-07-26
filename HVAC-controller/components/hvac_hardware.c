@@ -2,6 +2,10 @@
 #include "driver.gpio.h"
 #include "esp_log.h"
 
+/**
+ * HVAC_HARDWARE_C
+ * Implements setup functions and timer callbacks for heating startup stages
+ */
 QueueHandle_t hvac_queue = NULL;
 TimerHandle_t flame_proving_timer = NULL;
 TimerHandle_t fan_warmup_timer = NULL;
@@ -40,4 +44,6 @@ void init_hvac_hardware(void) {
 
     // Initialize timers
     flame_proving_timer = xTimerCreate("FlameTimer", pdMS_TO_TICKS(5000), pdFALSE, NULL, flame_proving_timeout_callback);
+    fan_warmup_timer = xTimerCreate("WarmupTimer", pdMS_TO_TICKS(10000), pdFALSE, NULL, warmup_done_callback);
+    tach_window_timer = xTimerCreate("TachTimeout", pdMS_TO_TICKS(1000), pdFALSE, NULL, tach_timeout_callback);
 }
