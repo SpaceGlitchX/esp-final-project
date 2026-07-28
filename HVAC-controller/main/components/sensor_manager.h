@@ -7,15 +7,15 @@
 #include <stdint.h>
 
 // Hardware pin configuration
-#define ANALOG_FLAME_CHANNEL ADC_CHANNEL_6 // GPIO 34
-#define FLAME_THRESHOLD 500
+#define ADC_UNIT    ADC_UNIT_1
+#define ADC_CHAN    ADC_CHANNEL_3 // Pin 34
+#define ADC_ATTEN   ADC_ATTEN_DB_12
 
 #define FAN_TACH_PIN 16
 
 #define TEMP_SENSE_PIN 4
 
-// ADC and timer handles
-extern adc_oneshot_unit_handle_t adc1_handle;
+// timer handles
 extern TimerHandle_t analog_sample_timer;
 extern TimerHandle_t temp_sample_timer;
 

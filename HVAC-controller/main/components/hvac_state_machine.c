@@ -35,6 +35,16 @@ void hvac_state_machine_task(void *pvParameters) {
                     }
                     break;
                 case STATE_IGNITION:
+                    if (event == CMD_FLAME_DETECTED) {
+                        stop_flame_proving_monitor();
+                        xTimerStart(fan_warmup_timer, 0);
+                        xTimerStop(flame_proving_timer, 0);
+                        update_state(STATE_WARMUP);
+                    } else if (event == CMD_FLAME_TIMEOUT) {
+                        stop_flame_proving_monitor();
+                        xTimerStop(flame_proving_timer, 0);
+                        update_state(STATE_FAULT);
+                    }
                     break;
                 case STATE_WARMUP:
                     break;
