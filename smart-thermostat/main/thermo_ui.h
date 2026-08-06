@@ -8,11 +8,15 @@
 Covers buttons and the LCD screen. Also covers user-related data.
 */
 
-//  Pushbutton inputs
-#define SET_UP GPIO_NUM_4
-#define SET_DWN GPIO_NUM_0
-#define SEL_UP GPIO_NUM_2
-#define SEL_DWN GPIO_NUM_15
+/*  BUTTON INPUTS
+Buttons will be arranged in 4 cardinal directions.
+SEL buttons are right & left. They increment through different LCD "views"
+SET buttons are up & down. They increment & decrement the selected setting of the current "view"
+*/
+#define SET_UP GPIO_NUM_4   // Increment selected setting
+#define SET_DWN GPIO_NUM_0  // Decrement selected setting
+#define SEL_UP GPIO_NUM_2   // Increment through LCD views
+#define SEL_DWN GPIO_NUM_15 // Decrement through LCD views
 //  LCD OUTPUTS
 #define CONT GPIO_NUM_25    // Output toward LCD contast pin, needs DAC
 #define LCD_RS GPIO_NUM_19  // Register Select pin: 0 means means incoming data is a command, 1 means it's character data
