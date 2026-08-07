@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+#include <string.h>
 #pragma once
 
 /*  USER-INTERFACE HEADER
@@ -25,3 +27,18 @@ SET buttons are up & down. They increment & decrement the selected setting of th
 #define LCD_D6 GPIO_NUM_5   // LCD Data pin 6
 #define LCD_D5 GPIO_NUM_17  // LCD Data pin 5
 #define LCD_D4 GPIO_NUM_16  // LCD Data pin 4
+
+//  STRUCTS
+/*LCD VIEW
+Pushing the SEL buttons circulates the LCD between different screens - called "views"
+Each view struct holds pointers to the relevant data and strings to display.
+*/
+typedef struct {
+    void* setting;      // Data that should be manipulated when SET buttons are pressed
+    void* data;         // Data that should be displayed (and not edited)
+    char* top_text;     // Text for the top row
+    char* bottom_text   // Text for the bottom row
+} view;
+
+//  GLOBALS
+
