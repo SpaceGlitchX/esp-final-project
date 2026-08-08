@@ -97,6 +97,9 @@ void hvac_state_machine_task(void *pvParameters) {
                 case STATE_FAULT:
                     set_heater_state(0);
                     set_fan_state(0);
+                    if (event == CMD_OFF) {
+                        update_state(STATE_IDLE);
+                    }
                     break;
             }
         }

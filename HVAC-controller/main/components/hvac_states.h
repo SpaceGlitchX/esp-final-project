@@ -27,7 +27,7 @@ typedef enum {
 typedef enum {
     FLT_FLAME,
     FLT_FAN,
-    FLT_OTHER
+    FLT_NONE
 } hvac_flt_t;
 
 #endif
