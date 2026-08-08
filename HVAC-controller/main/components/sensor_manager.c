@@ -1,38 +1,67 @@
 #include "sensor_manager.h"
-#include "hvac_hardware.h"
-#include "driver/gpio.h"
-#include "esp_err.h"
-#include "esp_adc/adc_oneshot.h"
-#include <stdio.h>
+
+
+/**
+ * @class SensorManager
+ * @brief Manages the initialization and monitoring of various sensors in the HVAC system.
+ */
 
 static TimerHandle_t analog_sample_timer = NULL;
+static TimerHandle_t temp_sample_timer = NULL;
+static TimerHandle_t tach_monitor_timer = NULL;
 
+/**
+ * @brief Callback function for analog sample timer
+ */
 static void analog_flame_check_callback(TimerHandle_t xTimer) {
-    float raw_analog_value = 0;
-    ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, ADC_CHAN, &raw_analog_value)
-    ESP_LOGI("KY-026", "Flame sensor Raw ADC Value: %0.2f", raw_analog_value)
+    flame_sense.read();
 }
 
-void init_sensors(void) {
-
-    // Analog input channel config for flame sewnsor
-    adc_oneshot_unit_handle_t adc1_handle;
-    adc_oneshot_unit_init_cfg_t = init_config1 = {
-        .unit_id = ADC_UNIT
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
-
-    adc_oneshot_chan_cfg_t config = {
-        .bitwidth = ADC_BANDWIDTH_DEFAULT,
-        .atten = ADC_ATTEN // Full scale configuration up to 3.3 V
-    };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHAN, &config))
+/**
+ * @brief Callback function for temperature sample timer
+ */
+static void tach_monitor_callback(TimerHandle_t xTimer) {
+    tach_sense.read();
 }
 
+/**
+ * @brief Initialize the sensors
+ */
+void sensor_manager_init(void) {
+    flame_sense.init();
+    tach_sense.init();
+
+    analog_sample_timer = xTimerCreate("ADC_SAMPLE_TIMER", pdMS_TO_TICKS(100), pdTRUE, NULL, analog_flame_check_callback);
+    tach_monitor_timer = xTimerCreate("TACH_SAMPLE_TIMER", pdMS_TO_TICKS(100), pdTRUE, NULL, tach_monitor_callback);
+}
+
+/**
+ * @brief Start the flame proving monitor
+ */
 void start_flame_proving_monitor(void) {
     xTimerStart(analog_sample_timer, 0);
 }
 
+/**
+ * @brief Stop the flame proving monitor
+ */
 void stop_flame_proving_monitor(void) {
     xTimerStop(analog_sample_timer, 0);
 }
+
+/**
+ * @brief Start tachometer monitoring
+ */
+void start_tach_monitoring(void) {
+    ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
+    xTimerStart(tach_monitor_timer, 0);
+}
+
+/**
+ * @brief Stop tachometer monitoring
+ */
+void stop_tach_monitoring(void) {
+    ESP_ERROR_CHECK(pcnt_unit_stop(pcnt_unit));
+    xTimerStop(tach_monitor_timer, 0);
+}
+

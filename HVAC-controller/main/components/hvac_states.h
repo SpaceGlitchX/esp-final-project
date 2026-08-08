@@ -23,4 +23,11 @@ typedef enum {
     CMD_TACH_TIMEOUT
 } hvac_cmd_t;
 
+// Fault flag
+typedef enum {
+    FLT_FLAME,
+    FLT_FAN,
+    FLT_OTHER
+} hvac_flt_t;
+
 #endif

@@ -5,6 +5,8 @@
 #include "freertos/queue.h"
 #include "freertos/timers.h"
 #include "hvac_states.h"
+#include "driver/gpio.h"
+#include "esp_log.h"
 
 // Hardware pins
 #define HEATER_PIN 21
