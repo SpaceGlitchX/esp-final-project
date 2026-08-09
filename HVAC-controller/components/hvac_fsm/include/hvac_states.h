@@ -4,6 +4,7 @@
 // State machine blocks
 typedef enum {
     STATE_IDLE = 0,
+    STATE_WAIT_DELAY,       
     STATE_FAN_CIRCULATE,
     STATE_IGNITION,
     STATE_WARMUP,
@@ -19,15 +20,17 @@ typedef enum {
     CMD_HEAT,
     CMD_FLAME_DETECTED,
     CMD_FLAME_TIMEOUT,
+    CMD_FAN_OK,
     CMD_WARMUP_DONE,
-    CMD_TACH_TIMEOUT
+    CMD_TACH_TIMEOUT,
+    CMD_STATE_DELAY_COMPLETE
 } hvac_cmd_t;
 
 // Fault flag
 typedef enum {
+    FLT_NONE = 0,            
     FLT_FLAME,
-    FLT_FAN,
-    FLT_NONE
+    FLT_FAN
 } hvac_flt_t;
 
-#endif
+#endif // HVAC_STATES_H

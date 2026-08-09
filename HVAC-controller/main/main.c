@@ -1,23 +1,45 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
-#include "components/hvac_states.h"
+#include "esp_log.h"
+#include "hvac_state_machine.h"
+#include "hardware_manager.h"
+#include "sensor_manager.h"
 
-
-QueueHandle_t hvac_queue = NULL;
-hvac_state_t g_current_hvac_state = STATE_IDLE;
-hvac_flt_t g_current_hvac_fault = FLT_NONE;
-
-extern void hvac_state_machine_task(void *pvParameters);
+// Forward declaration of test runner task
 extern void hvac_test_runner_task(void *pvParameters);
 
 void app_main(void) {
-    // 1. Create FreeRTOS Event Queue
-    hvac_queue = xQueueCreate(10, sizeof(hvac_cmd_t));
+    ESP_LOGI("MAIN", "Initializing HVAC Subsystems...");
 
-    // 2. Start Core FSM Task
-    xTaskCreate(hvac_state_machine_task, "fsm_task", 4096, NULL, 10, NULL);
+    // 1. Initialize Hardware & Timers
+    init_hvac_hardware();
+    sensor_manager_init();
 
-    // 3. Launch Test Suite Task
-    xTaskCreate(hvac_test_runner_task, "test_runner", 4096, NULL, 5, NULL);
+    // 2. Initialize FSM Queue & Pacing Timers
+    if (hvac_state_machine_init() != ESP_OK) {
+        ESP_LOGE("MAIN", "Failed to initialize HVAC FSM!");
+        return;
+    }
+
+    // 3. Create FSM Background Task (MUST run alongside test task!)
+    xTaskCreatePinnedToCore(
+        hvac_state_machine_task,
+        "hvac_fsm_task",
+        4096,
+        NULL,
+        5,              // Priority 5
+        NULL,
+        0               // Core 0
+    );
+
+    // 4. Spawn Test Runner Task
+    xTaskCreatePinnedToCore(
+        hvac_test_runner_task,
+        "hvac_test_runner",
+        4096,
+        NULL,
+        4,              // Slightly lower priority than FSM so FSM processes events quickly
+        NULL,
+        0
+    );
 }

@@ -16,7 +16,7 @@ typedef struct FlameSensor {
 } FlameSensor;
 
 // Prototype declarations
-void flame_sensor_read(FlameSensor* self);
-void flame_sensor_init(FlameSensor* self);
+extern void flame_sensor_read(FlameSensor* self);
+extern void flame_sensor_init(FlameSensor* self);
 
-#endif FLAME_SENSOR_H
+#endif 
