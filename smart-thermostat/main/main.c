@@ -1,6 +1,9 @@
 #include "thermo_sensors.h"
+#include "thermo_sensors.c"
 #include "thermo_ui.h"
+#include "thermo_ui.c"
 #include "thermo_comms.h"
+#include "thermo_comms.c"
 
 /*  THE SCHEME:
     ESPs receive and output data to peripherals via GPIO

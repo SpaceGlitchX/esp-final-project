@@ -1,9 +1,7 @@
 #include "thermo_ui.h"
+#include "lcd_driver.c"
 
-
-
-void app_main(void)
-{
+void app_main(void){
     //  Define ISR
     isr_handle = xQueueCreate(10, sizeof(int));
     ESP_LOGI("main","interrupt queue created");

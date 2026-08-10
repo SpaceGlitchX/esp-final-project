@@ -9,6 +9,12 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "driver/dac_oneshot.h"
+//#include "hal/lcd_types.h"
+//#include "esp_lcd_panel_io.h"
+//#include "esp_lcd_panel_ops.h"
+//#include "driver/i2c_master.h"
+//#include "driver/ledc.h"
+#include "freertos/queue.h"
 
 #include <string.h>
 #pragma once
@@ -91,6 +97,7 @@ const uint8_t dac_high = 255;           // maximum value to be written to the DA
 TimerHandle_t timer_handle;
 QueueHandle_t isr_handle;
 
+const gpio_num_t lcd_data_pins[4] = {LCD_D4, LCD_D5, LCD_D6, LCD_D7};
 static uint8_t bmap = 0000 & 0xFF; // each button state is recorded in a bit; &0xFF simply maps the 4-bit (nibble) variable to a full byte
 
 
