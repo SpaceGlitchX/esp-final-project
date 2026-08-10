@@ -1,8 +1,6 @@
 #include "thermo_sensors.h"
 
-#include <stdio.h>
-#include "esp_err.h"
-#include "esp_adc/adc_oneshot.h"
+
 
 //~ This file configures ADC UNIT 1 and reads the two temperature sensors. 
 //~ Task temperature_sensor_task reads both sensors every 10 seconds then stores and prints their raw ADC values

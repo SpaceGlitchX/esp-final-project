@@ -2,6 +2,7 @@
 Based on the 1602 driver written by Aad van Gerwen
 https://components.espressif.com/components/vgerwen/lcd1602
 */
+#pragma once
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -9,7 +10,7 @@ https://components.espressif.com/components/vgerwen/lcd1602
 #include "driver/gpio.h"
 #include "driver/dac_oneshot.h"
 
-#pragma once
+
 
 //  LCD OUTPUTS
 #define CONT GPIO_NUM_25    // Output toward LCD contrast pin, needs DAC

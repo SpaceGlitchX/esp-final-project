@@ -5,6 +5,9 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 
+#include <stdio.h>
+#include "esp_err.h"
+
 //~  COMMUNICATIONS HEADER
 //~ Defines the UART settings, HVAC commands, states and faults
 //~ Declares the shared comm data and UART task functions
