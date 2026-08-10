@@ -1,7 +1,10 @@
 #include "thermo_comms.h"
 
-#include <stdio.h>
-#include "esp_err.h"
+
+
+//~ This file configures UART comm between thermostat and HVAC
+//~ Sends the termostat command every 10 sec. 
+//~ Receives the current HVAC state and fault value
 
 //Sends a command every 10 seconds
 #define UART_TRANSMIT_PERIOD_MS 10000 
