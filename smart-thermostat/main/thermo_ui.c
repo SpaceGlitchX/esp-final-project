@@ -1,5 +1,4 @@
 #include "thermo_ui.h"
-#include "lcd_driver.c"
 
 void app_main(void){
     //  Define ISR
