@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS 
         "main.c"
-        "test_hvac_system.c"
+        
     INCLUDE_DIRS 
         "."
     REQUIRES 

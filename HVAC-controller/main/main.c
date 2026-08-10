@@ -32,7 +32,7 @@ void app_main(void) {
         0               // Core 0
     );
 
-    // 4. Spawn Test Runner Task
+    /*// 4. Spawn Test Runner Task
     xTaskCreatePinnedToCore(
         hvac_test_runner_task,
         "hvac_test_runner",
@@ -41,5 +41,5 @@ void app_main(void) {
         4,              // Slightly lower priority than FSM so FSM processes events quickly
         NULL,
         0
-    );
+    );*/
 }

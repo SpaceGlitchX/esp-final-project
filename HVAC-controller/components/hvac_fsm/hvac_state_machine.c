@@ -10,12 +10,12 @@ static const char *TAG = "HVAC_FSM";
 QueueHandle_t hvac_queue = NULL;
 
 // Global System Monitoring Variables
-hvac_state_t g_current_hvac_state = STATE_IDLE;
+hvac_state_t g_current_hvac_state = STATE_FAN_CIRCULATE;
 hvac_flt_t g_current_hvac_fault   = FLT_NONE;
 
 // Timer & Pacing Delay Handles
 static TimerHandle_t state_pacing_timer = NULL;
-static hvac_state_t  g_next_pending_state = STATE_IDLE;
+static hvac_state_t  g_next_pending_state = STATE_FAN_CIRCULATE;
 
 static void update_state(hvac_state_t state) {
     ESP_LOGI(TAG, "State Transition: %d -> %d", g_current_hvac_state, state);

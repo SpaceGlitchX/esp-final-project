@@ -10,7 +10,7 @@
 
 // Hardware pins
 #define HEATER_PIN 21
-#define FAN_PIN 22
+#define FAN_PIN 25
 
 // Queue and timer handles
 extern TimerHandle_t flame_proving_timer;
