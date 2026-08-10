@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
@@ -41,6 +42,15 @@ SET buttons are up & down. They increment & decrement the selected setting of th
 #define LCD_D5 GPIO_NUM_17  // LCD Data pin 5
 #define LCD_D4 GPIO_NUM_16  // LCD Data pin 4
 
+//  IDENTITIES
+#define COMMAND 1
+#define DATA 0
+//  COMMANDS
+#define CLEAR 0x01
+#define LINE_1_FOREWARD 0x80
+#define LINE_1_BACKWARD 0x60
+#define LINE_2_FOREWARD 0x40
+#define LINE_2_BACKWARD 0x20
 
 //  STRUCTS
 /*  LCD VIEW
@@ -112,3 +122,27 @@ static void IRAM_ATTR isr_trig(void *param);
 static void IRAM_ATTR set_dwn_isr(void *param);
 static void IRAM_ATTR sel_up_isr(void *param);
 static void IRAM_ATTR sel_dwn_isr(void *param);
+
+/*  TRIGGER LCD ENABLE PIN
+    forces the E pin low, high, and then low again
+    the LCD latches data on the falling edge of the pulse
+*/
+static void lcd_enable(void);
+/*  SEND 4-BIT CHARACTER
+    takes an array of 4 pins which will transmit the data
+    also takes an unsigned char (an 8-bit character) but sends only the lower 4 bits
+*/
+static void send_nibble(gpio_num_t data, unsigned char c);
+/*  LCD COMMAND
+    Write a command to the LCD, given a character to send
+*/
+static void lcd_command(unsigned char command);
+/*  LCD WRITE
+    Write data to the LCD, given a character to send
+*/
+static void lcd_write_byte(unsigned char data);
+/*  LCD INITIALIZE
+    Set up LCD
+    this function is heavily dervived from Aad van Gerwen's driver
+*/
+void lcd_init(void);
