@@ -9,7 +9,7 @@
 #include "esp_err.h"
 #include "esp_system.h"
 #include "esp_timer.h"
-#include "driver/dac_oneshot.h"
+#include "esp_adc/adc_oneshot.h"
 //#include "hal/lcd_types.h"
 //#include "esp_lcd_panel_io.h"
 //#include "esp_lcd_panel_ops.h"
@@ -100,9 +100,9 @@ View 3: Set Units
 
 //  GLOBALS
 
-const dac_oneshot_config_t dac_config;
-static dac_oneshot_handle_t dac_handle = DAC_CHAN_0;
-const uint8_t dac_high = 255;           // maximum value to be written to the DAC (the LCD contrast pin, pin 25)
+const adc_oneshot_config_t dac_config;
+static adc_oneshot_handle_t dac_handle = adc_CHAN_0;
+const uint8_t adc_high = 255;           // maximum value to be written to the DAC (the LCD contrast pin, pin 25)
 
 TimerHandle_t timer_handle;
 QueueHandle_t isr_handle;
