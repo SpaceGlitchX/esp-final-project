@@ -30,4 +30,6 @@ esp_err_t hvac_state_machine_init(void);
  */
 void hvac_state_machine_task(void *pvParameters);
 
+void get_hvac_state(void);
+void get_hvac_fault(void);
 #endif // HVAC_STATE_MACHINE_H

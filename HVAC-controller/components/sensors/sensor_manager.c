@@ -1,11 +1,4 @@
 #include "sensor_manager.h"
-#include "flame_sensor.h"
-#include "tach_sensor.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#include "driver/pulse_cnt.h"
-#include "esp_log.h"
 
 static const char *TAG = "SENSOR_MGR";
 

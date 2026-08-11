@@ -2,7 +2,7 @@
 
 static const char *TAG = "FLAME_SENSOR";
 
-// Instantiate global instances required by the linker
+// Instantiate global instance
 FlameSensor flame_sensor = {0};
 
 

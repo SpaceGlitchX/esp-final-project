@@ -1,16 +1,15 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/timers.h"
-#include "esp_adc/adc_oneshot.h"
-#include "hardware_manager.h"
-#include "driver/gpio.h"
-#include "esp_err.h"
-#include <stdio.h>
-#include "driver/pulse_cnt.h"
+#include "sensor_manager.h"
 #include "flame_sensor.h"
 #include "tach_sensor.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
+#include "driver/pulse_cnt.h"
+#include "esp_log.h"
+#include <stdio.h>
 
 // Timer handles (external reference)
 extern TimerHandle_t analog_sample_timer;

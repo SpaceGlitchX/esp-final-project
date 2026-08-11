@@ -3,7 +3,8 @@ idf_component_register(
         "flame_sensor.c"
         "tach_sensor.c"
         "sensor_manager.c"
-    INCLUDE_DIRS 
+    
+        INCLUDE_DIRS 
         "include"
     REQUIRES 
         freertos 

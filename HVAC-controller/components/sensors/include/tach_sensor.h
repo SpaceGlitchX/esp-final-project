@@ -9,9 +9,9 @@
 #define FAN_TACH_PIN 18
 
 typedef struct TachSensor {
-    uint32_t fan_rpm;
     pcnt_unit_handle_t pcnt_unit;
     pcnt_channel_handle_t pcnt_chan;
+    uint32_t fan_rpm;
     void (*init)(struct TachSensor* self);
     void (*read)(struct TachSensor* self);
 
