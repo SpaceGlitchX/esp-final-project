@@ -5,11 +5,7 @@
 //~ This file configures ADC UNIT 1 and reads the two temperature sensors. 
 //~ Task temperature_sensor_task reads both sensors every 10 seconds then stores and prints their raw ADC values
 
-#define INDOOR_TEMP_CHANNEL ADC_CHANNEL_0 //& GPIO36
-#define OUTDOOR_TEMP_CHANNEL ADC_CHANNEL_3 //& GPIO39
 
-//Reads both sensors every 10 sec.
-#define SENSOR_PERIOD_MS 10000
 
 //Most recent indoor temp. reading
 int indoor_temperature_raw = 0;
