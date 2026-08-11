@@ -1,6 +1,7 @@
 #ifndef UI_H
 #define UI_H
 
+#include "thermo_sensors.h"
 #include "LCD.h"
 
 #define SET_UP GPIO_NUM_4
@@ -15,9 +16,11 @@ typedef struct {
     char* bottom_text;
 } view;
 
-typedef struct {
-    
-}
+extern int indoor_temperature_raw;
+extern int outdoor_temperature_raw;
+int user_setpoint;
+
+uint64_t input_buttons;
 extern void ui_init(void);
 
 

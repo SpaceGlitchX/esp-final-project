@@ -19,10 +19,10 @@
 #define TEMP_VO GPIO_NUM_39 // Outdoor temperature sensor 
 
 //Most recent indoor temp. reading
-extern int indoor_temperature_raw;
+int indoor_temperature_raw;
 
 //Most recent outdoor temp. reading
-extern int outdoor_temperature_raw;
+int outdoor_temperature_raw;
 
 //Configure the ADC and creates the temp. sensor task
 void thermo_sensors_init(void);
