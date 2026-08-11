@@ -1,6 +1,6 @@
 #include LCD.h
 
-static const char *TAG = "LCD1602_NATIVE";
+static const char *TAG = "LCD1602";
 
 esp_err_t i2c_master_init(void) {
     i2c_config_t conf = {
@@ -55,6 +55,14 @@ void lcd_init(void) {
     vTaskDelay(pdMS_TO_TICKS(5));
     
     ESP_LOGI(TAG, "Native LCD Initialization Sequence Finished.");
+
+    lcd_init();
+
+    lcd_set_cursor(0, 0);
+    lcd_send_string("Native I2C Mode");
+
+    lcd_set_cursor(1, 0);
+    lcd_send_string("No Expander Pack");
 }
 
 
