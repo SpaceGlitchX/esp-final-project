@@ -42,7 +42,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(SET_DWN, isr_handler, (void*)SET_DWN));
     
     lcd_set_cursor(0, 0);
-    lcd_write(bottom_text);
+    lcd_send_string(bottom_text);
 
     update_temperature_timer = xTimerCreate("Temp Timer", pdMS_TO_TICKS(100000), pdTRUE, NULL, get_temperature_update);
     xTimerStart(update_temperature_timer, 100);

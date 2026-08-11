@@ -1,5 +1,3 @@
-#ifndef LCD_H
-#define LCD_H
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -7,6 +5,9 @@
 #include "driver/i2c.h"
 #include "esp_log.h"
 #include <stdint.h>
+
+#ifndef LCD_H
+#define LCD_H
 
 #define I2C_MASTER_NUM             I2C_NUM_0    // Built-in I2C peripheral port
 #define I2C_MASTER_SDA_IO          21           // Default SDA Pin
@@ -31,10 +32,10 @@
 
 char buffer[16];
 esp_err_t i2c_master_init(void);
-void lcd_send_command(uint8_t cmd);
-void lcd_send_data(uint8_t data);
-void lcd_init(void);
-void lcd_set_cursor(uint8_t row, uint8_t col);
-void lcd_send_string(const char *str);
+extern void lcd_send_command(uint8_t cmd);
+extern void lcd_send_data(uint8_t data);
+extern void lcd_init(void);
+extern void lcd_set_cursor(uint8_t row, uint8_t col);
+extern void lcd_send_string(const char *str);
 
 #endif

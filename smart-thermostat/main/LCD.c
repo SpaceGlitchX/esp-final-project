@@ -1,4 +1,4 @@
-#include LCD.h
+#include "LCD.h"
 
 static const char *TAG = "LCD1602";
 
@@ -56,7 +56,7 @@ void lcd_init(void) {
     
     ESP_LOGI(TAG, "Native LCD Initialization Sequence Finished.");
 
-    lcd_init();
+    i2c_master_init();
 
     lcd_set_cursor(0, 0);
     lcd_send_string("Native I2C Mode");
