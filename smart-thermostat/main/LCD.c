@@ -1,18 +1,18 @@
 #include "LCD.h"
 
-static char buffer[16] = {0};
-
+static const char *TAG = "LCD";
+static char buffer[17] = {0};
 void i2c_lcd_init(void) {
-    char buffer[16] = {0};
+static i2c_lcd1602_info_t lcd_handle;
 
 
     i2c_master_bus_config_t bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_MASTER_NUM.
+        .i2c_port = I2C_MASTER_NUM,
         .scl_io_num = I2C_MASTER_SCL_IO,
         .sda_io_num = I2C_MASTER_SDA_IO,
         .glitch_ignore_cnt = 7,
-        .flags.enable_intenal_pullup = true,
+        .flags.enable_internal_pullup = true,
     };
 
     i2c_master_bus_handle_t bus_handle;
@@ -21,7 +21,7 @@ void i2c_lcd_init(void) {
     
     ESP_LOGI(TAG, "I2C master bus initialized successfully. \n");
 
-    i2c_lcd1602_info_t lcd_handle {
+    i2c_lcd1602_info_t lcd_handle = {
         .i2c_port = I2C_MASTER_NUM,
         .address = LCD_I2C_ADDRESS,
         .num_rows = 2,
@@ -45,7 +45,7 @@ void set_backlight(int level) {
 
 void lcd_write(const char* text, int row, int col) {
 
-    snprint(buffer, sizeof(buffer), text);
+    snprint(buffer, sizeof(buffer), "%s", text);
 
     i2c_lcd1602_move_cursor(&lcd_handle, row, col);
     i2c_lcd1602_write_string(&lcd_handle, buffer);

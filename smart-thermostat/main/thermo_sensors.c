@@ -5,19 +5,15 @@
 //~ This file configures ADC UNIT 1 and reads the two temperature sensors. 
 //~ Task temperature_sensor_task reads both sensors every 10 seconds then stores and prints their raw ADC values
 
+static struct SensorData temp;
 
-
-//Most recent indoor temp. reading
-int indoor_temperature_raw = 0;
-
-//Most recent outdoor temp. reading
-int outdoor_temperature_raw = 0;
 
 //Handle used to access ADC unit 1
 static adc_oneshot_unit_handle_t adc_handle;
 
 void thermo_sensors_init(void)
 {
+
     //Config for ADC unit 1
     adc_oneshot_unit_init_cfg_t adc_unit_config = {
         .unit_id = ADC_UNIT_1
@@ -62,23 +58,19 @@ void temperature_sensor_task(void *pvParameters)
     while(1)
     {
         //Reads the indoor thermistor
-        indoor_read_result = adc_oneshot_read(adc_handle, INDOOR_TEMP_CHANNEL, &indoor_temperature_raw);
+        indoor_read_result = adc_oneshot_read(adc_handle, INDOOR_TEMP_CHANNEL, &temp.indoor_temp);
 
         //Reads the outdoor thermistor
-        outdoor_read_result = adc_oneshot_read(adc_handle, OUTDOOR_TEMP_CHANNEL, &outdoor_temperature_raw);
+        outdoor_read_result = adc_oneshot_read(adc_handle, OUTDOOR_TEMP_CHANNEL, &temp.outdoor_temp);
 
         //Checks if both readings have been received
         if (indoor_read_result == ESP_OK && outdoor_read_result == ESP_OK)
         {
-            printf("Indoor ADC: %d, Outdoor ADC: %d \n", indoor_temperature_raw, outdoor_temperature_raw);
+            printf("Indoor ADC: %d, Outdoor ADC: %d \n", temp.indoor_temp, temp.outdoor_temp);
         }
         else{
             printf("Failed to read temperature sensors\n");
         }
         vTaskDelay(pdMS_TO_TICKS(SENSOR_PERIOD_MS));
     }
-}
-
-void get_temperature_raw(void) {
-    return (indoor_temperature_raw,outdoor_temperature_raw);
 }
