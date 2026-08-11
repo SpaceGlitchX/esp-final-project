@@ -26,8 +26,7 @@ void app_main(void) {
 
     user_setpoint = 20;
     input_buttons = ((1ULL << SET_UP) | (1ULL << SET_DWN) | (1ULL << SEL_UP) | (1ULL << SEL_DWN));
-    i2c_lcd_init();
-    lcd_clear();
+    lcd_init();
 
     gpio_config_t button_config = {
         .intr_type = GPIO_INTR_NEGEDGE,
@@ -42,7 +41,8 @@ void app_main(void) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(SET_UP, isr_handler, (void*)SET_UP));
     ESP_ERROR_CHECK(gpio_isr_handler_add(SET_DWN, isr_handler, (void*)SET_DWN));
     
-    lcd_write(bottom_text, 0, 0);
+    lcd_set_cursor(0, 0);
+    lcd_write(bottom_text);
 
     update_temperature_timer = xTimerCreate("Temp Timer", pdMS_TO_TICKS(100000), pdTRUE, NULL, get_temperature_update);
     xTimerStart(update_temperature_timer, 100);

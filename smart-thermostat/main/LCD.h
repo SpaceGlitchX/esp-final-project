@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
+#include <stdint.h>
 
 #define I2C_MASTER_NUM             I2C_NUM_0    // Built-in I2C peripheral port
 #define I2C_MASTER_SDA_IO          21           // Default SDA Pin
