@@ -1,57 +1,89 @@
-#include "LCD.h"
+#include LCD.h
 
-static const char *TAG = "LCD";
-static char buffer[17] = {0};
-void i2c_lcd_init(void) {
-static i2c_lcd1602_info_t lcd_handle;
+static const char *TAG = "LCD1602_NATIVE";
 
-
-    i2c_master_bus_config_t bus_config = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = I2C_MASTER_SCL_IO,
+esp_err_t i2c_master_init(void) {
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
         .sda_io_num = I2C_MASTER_SDA_IO,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE, // Enable internal pullup
+        .scl_io_num = I2C_MASTER_SCL_IO,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE, // Enable internal pullup
+        .master.clk_speed = I2C_MASTER_FREQ_HZ,
     };
-
-    i2c_master_bus_handle_t bus_handle;
-    ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus_handle));
     
+    esp_err_t err = i2c_param_config(I2C_MASTER_NUM, &conf);
+    if (err != ESP_OK) return err;
     
-    ESP_LOGI(TAG, "I2C master bus initialized successfully. \n");
+    return i2c_driver_install(I2C_MASTER_NUM, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
+}
 
-    i2c_lcd1602_info_t lcd_handle = {
-        .i2c_port = I2C_MASTER_NUM,
-        .address = LCD_I2C_ADDRESS,
-        .num_rows = 2,
-        .num_columns = 16,
-        .backlight = true
-    };
-
-    ESP_ERROR_CHECK(i2c_lcd1602_init(&lcd_handle));
-    ESP_LOGI(TAG, "LCD1602 initialized successfully. ");
-
-    }
-
-void set_backlight(int level) {
+void lcd_send_command(uint8_t cmd) {
+    uint8_t write_buf[2] = {LCD_CONTROL_COMMAND, cmd};
     
-    if (level == 1) {
-        i2c_lcd1602_set_backlight(&lcd_handle, true);
-    } else {
-        i2c_lcd1602_set_backlight(&lcd_handle, false);
+    // Direct link abstraction to transmit address and payload via driver/i2c.h
+    esp_err_t err = i2c_master_write_to_device(I2C_MASTER_NUM, LCD_I2C_ADDRESS, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Command transfer failed: %s", esp_err_to_name(err));
     }
 }
 
-void lcd_write(const char* text, int row, int col) {
 
-    snprint(buffer, sizeof(buffer), "%s", text);
-
-    i2c_lcd1602_move_cursor(&lcd_handle, row, col);
-    i2c_lcd1602_write_string(&lcd_handle, buffer);
-
+void lcd_send_data(uint8_t data) {
+    uint8_t write_buf[2] = {LCD_CONTROL_DATA, data};
+    
+    esp_err_t err = i2c_master_write_to_device(I2C_MASTER_NUM, LCD_I2C_ADDRESS, write_buf, sizeof(write_buf), pdMS_TO_TICKS(1000));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Data transfer failed: %s", esp_err_to_name(err));
+    }
 }
 
-void lcd_clear(void) {
-    i2c_lcd_clear(&lcd_handle);
+
+void lcd_init(void) {
+    vTaskDelay(pdMS_TO_TICKS(50)); // Wait for internal controller to power up completely
+    
+    lcd_send_command(LCD_CMD_FUNCTION_SET);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
+    lcd_send_command(LCD_CMD_DISPLAY_CONTROL);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
+    lcd_send_command(LCD_CMD_CLEAR_DISPLAY);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
+    lcd_send_command(LCD_CMD_ENTRY_MODE_SET);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    
+    ESP_LOGI(TAG, "Native LCD Initialization Sequence Finished.");
+}
+
+
+void lcd_set_cursor(uint8_t row, uint8_t col) {
+    uint8_t address = (row == 0) ? (0x00 + col) : (0x40 + col);
+    lcd_send_command(0x80 | address); // Set DDRAM Address instruction mask
+}
+
+
+void lcd_send_string(const char *str) {
+    while (*str) {
+        lcd_send_data((uint8_t)(*str));
+        str++;
+    }
+}
+
+void app_main(void) {
+    ESP_ERROR_CHECK(i2c_master_init());
+    ESP_LOGI(TAG, "I2C master setup initiated.");
+
+    lcd_init();
+
+    lcd_set_cursor(0, 0);
+    lcd_send_string("Native I2C Mode");
+
+    lcd_set_cursor(1, 0);
+    lcd_send_string("No Expander Pack");
+    
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
