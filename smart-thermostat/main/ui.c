@@ -20,7 +20,7 @@ void get_temperature_update(TimerHandle_t xTimer) {
     snprintf(top_text, sizeof(top_text), "%d   %d", temp.indoor_temp, temp.outdoor_temp);
 }
 
-void app_main(void) {
+void ui_init(void) {
 
     thermo_queue = xQueueCreate(10, sizeof(int));
 
