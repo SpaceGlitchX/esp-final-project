@@ -78,3 +78,7 @@ void temperature_sensor_task(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(SENSOR_PERIOD_MS));
     }
 }
+
+void get_temperature_raw(void) {
+    return (indoor_temperature_raw,outdoor_temperature_raw);
+}

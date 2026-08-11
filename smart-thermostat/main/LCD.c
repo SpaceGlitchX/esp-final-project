@@ -1,8 +1,9 @@
 #include "LCD.h"
 
-extern char buffer[16] = {0};
+static char buffer[16] = {0};
 
 void i2c_lcd_init(void) {
+    char buffer[16] = {0};
 
 
     i2c_master_bus_config_t bus_config = {
@@ -42,7 +43,7 @@ void set_backlight(int level) {
     }
 }
 
-void lcd_write(const char* text, char* buffer, int row, int col) {
+void lcd_write(const char* text, int row, int col) {
 
     snprint(buffer, sizeof(buffer), text);
 

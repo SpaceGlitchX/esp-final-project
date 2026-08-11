@@ -11,11 +11,11 @@
 #define I2C_MASTER_FREQ_HZ          100000            // I2C master clock frequency (100kHz)
 #define LCD_I2C_ADDRESS             0x27  
 
-extern char buffer[16];
-extern void i2c_lcd_init(void);
-extern void set_backlight(int level);
-extern void lcd_write(const char* text, char* buffer, int row, int col);
-extern void lcd_clear(void);
+static char buffer[16];
+void i2c_lcd_init(void);
+void set_backlight(int level);
+void lcd_write(const char* text, int row, int col);
+void lcd_clear(void);
 
 static const char *TAG = "i2c_lcd";
 static i2c_lcd1602_info_t lcd_handle;

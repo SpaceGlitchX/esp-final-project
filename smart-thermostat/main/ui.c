@@ -3,7 +3,9 @@
 extern int outdoor_temperature_raw;
 extern int indoor_temperature_raw;
 static QueueHandle_t thermo_queue = NULL;
-char bottom_text = "IN   OUT   SET";
+TimerHandle_t update_temperature_timer = NULL;
+
+char* bottom_text = "IN   OUT   SET";
 
 static void IRAM_ATTR isr_handler(void *arg) {
     int button = (int)args;
@@ -12,6 +14,10 @@ static void IRAM_ATTR isr_handler(void *arg) {
     if (xHigherTaskPriorityWoken) {
         portYIELD_FROM_ISR();
     }
+}
+
+void get_temperature_raw(TimerHandle_t xTimer) {
+
 }
 void ui_init(void) {
 
@@ -35,9 +41,8 @@ void ui_init(void) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(SET_UP, isr_handler, (void*)SET_UP));
     ESP_ERROR_CHECK(gpio_isr_handler_add(SET_DWN, isr_handler, (void*)SET_DWN));
     
-    
+    lcd_write(bottom_text, 0, 0);
 
-
-
-
+    update_temperature_timer = xTimerCreate("Temp Timer", pdMS_TO_TICKS(100000), pdTRUE, NULL, get_temperature_raw);
+    xTimerStart(update_temperature_timer, 100);
 }
