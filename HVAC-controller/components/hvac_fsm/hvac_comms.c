@@ -1,91 +1,117 @@
 #include "hvac_comms.h"
 
-static RX_data rx_data = {0};
-static TX_data_tx_data = {0};
-extern hvac_cmd_t ;
-extern hvac_flt_t current_fault
-void unpack_buffer_to_data(uint8_t *buffer, RX_data *data)
-{
-    // For each pair of bytes, reconstruct the uint16_t
-    data->thermostat_command = ((uint16_t)(buffer[0] << 8) | buffer[1]); // Combine high and low bytes
-    data->speed_mms = ((uint16_t)(buffer[2] << 8) | buffer[3]);    // Combine high and low bytes
+static const char *TAG = "HVAC_COMMS";
 
-    // Extract the single bytes
-    data->tooth_spacing = (uint8_t)buffer[4];
-    data->timestamp_us = ((uint32_t)(buffer[5] << 8) | buffer[6]); // Combine high and low bytes
-    data->checksum = buffer[7];
 
-    // Validate checksum
-    uint8_t calculated_checksum = 0;
-    for (int i = 0; i < 7; i++)
-    { // modulo 256 to fit in uint8_t
-        calculated_checksum += buffer[i];
+static uint8 calculate_checksum(const uint_8 *buffer, size_t length) {
+
+    uint8_t checksum = 0;
+    for (size_t i = 0; i < length; i++) {
+        checksum ^=buffer[i];
     }
-    if (calculated_checksum != data->checksum)
-    {
-        ESP_LOGE("RX", "ERROR: Data corruption!");
-    }
-    else
-    {
-        ESP_LOGI("RX", "Speed: %d mm/s", data->speed_mms);
-    }
+    return checksum;
 }
 
 // Function to set up UART for receiving data
 void uart_setup()
 {
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS, // 8 data bits
         .parity = UART_PARITY_DISABLE, // No parity
         .stop_bits = UART_STOP_BITS_1, // 1 stop bit
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+
+    ESP_ERROR_CHECK(
+        uart_driuver_install(
+            UART_PORT,
+            UART_RX_BUFFER_SIZE,
+            UART_TX_BUFFER_SIZE,
+            0,
+            NULL,
+            0));
+
+    ESP_ERROR_CHECK(
+        uart_param_config(
+            UART_PORT,
+            &uart_config));
+        
+    ESP_ERROR_CHECK(
+        uart_set_pin(
+            UART_PORT,
+            TX_PIN,
+            RX_PIN, 
+            UART_PIN_NO_CHANGE,
+            UART_PIN_NO_CHANGE));
 
     // Configure UART parameters and install driver
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, 1024 * 2, 0, 0, NULL, 0));
 
     // Log UART setup completion
     ESP_LOGI("UART", "UART setup successful: RX pin %d, TX pin %d", RX_PIN, TX_PIN);
 }
-// Function to receive data over UART and unpack it
-void uart_receive_task(void *pvParameters)
-{
-    uint8_t buffer[8];
-    
-    while (1)
-    {
-        // Read 8 bytes from UART with a timeout of 100ms
-        int len = uart_read_bytes(UART_NUM_1,
-                                  buffer,
-                                  sizeof(buffer),
-                                  pdMS_TO_TICKS(100));
-        
-        // If we received 8 bytes, unpack the data
-        if (len == sizeof(buffer))
-        {
-            SensorData data;
-            unpack_buffer_to_data(buffer, &data);
 
-            ESP_LOGI("RX",
-                     "Received Data: Frequency: %u Hz, Speed: %u mm/s, Tooth Spacing: %u mm, Timestamp: %u us, Checksum: %u",
-                     data.frequency_hz,
-                     data.speed_mms,
-                     data.tooth_spacing,
-                     data.timestamp_us,
-                     data.checksum);
-        }
-        // If we received fewer than 8 bytes, log a warning
-        else if (len > 0)
-        {
-            ESP_LOGW("RX", "Incomplete packet (%d/8 bytes)", len);
-        }
+bool unpack_thermostat_packet(thermostat_packet_t *data, uint8_t *buffer) {
+
+    uint8_t calculate_checksum;
+
+    // BYTE 0: HVAC CMD
+    data->thermostat_cmd = (hvac_cmd_t)buffer[0];
+
+    // BYTE 1-4: TIMESTAMP
+    memcpy(&data->timestamp_us, &buffer[1], sizeof(data->timestamp_us));
+
+    // BYTE 5: RECEIVED CHECKSUM
+    data->checksum = buffer[5];
+
+    calculate_checksum = calculate_checksum(buffer, 5);
+
+    if (calculate_checksum == data->checksum) {
+        return true;
+    } else {
+        ESP_LOGE(TAG, "Thermostat packet checksum error");
+        return false;
     }
 }
 
-void app_main(void)
-{
-    uart_setup();
-    xTaskCreate(uart_receive_task, "uart_receive_task", 4096, NULL, 10, NULL);
+void pack_hvac_status_packet(hvac_status_packet_t *data, uint8_t *buffer) {
+
+    // BYTE 0: CURRENT HVAC STATE
+    buffer[0] = (uint8_t)data->current_state;
+
+    // BYTE 1: CURRENT FAULT
+    buffer[1] = (uint8_t)data->current_fault;
+
+    // BYTE 2: FAN STATE
+    buffer[2] = (uint8_t)data->fan_state;
+
+    // BYTE 3-6: TIMESTAMP
+    memcpy(
+        &buffer[3],
+        &data->timestamp_us,
+        sizeof(data->timestamp_us)
+    );
+
+    // BYTE 7:
+    buffer[7] = calculate_checksum(buffer, 7);
+    data->checksum = buffer[7];
+}
+
+void uart_send(uint8_t *buffer, size_t length) {
+
+    int bytes_written = uart_write_bytes(
+        UART_PORT,
+        buffer,
+        length
+    );
+
+    if (bytes_written < 0) {
+        ESP_LOGE(TAG, "UART transmission failed");
+    }
+}
+
+void uart_receive(uint8_t *buffer, size_t length, uint32_t timeout_ms) {
+
+    return uart_read_bytes(UART_PORT, buffer, length, pdMS_TO_TICKS(timeout_ms));
 }
