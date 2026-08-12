@@ -2,10 +2,11 @@
 
 static QueueHandle_t thermo_queue = NULL;
 TimerHandle_t update_temperature_timer = NULL;
+TimerHandle_t ui_update_timer = NULL;
 static int user_setpoint;
 extern struct SensorData temp;
 
-char bottom_text[16] = "IN   OUT   SET";
+char bottom_text[16] = " IN   OUT   SET";
 
 static void IRAM_ATTR isr_handler(void *arg) {
     int button = (int)arg;
@@ -45,5 +46,20 @@ void ui_init(void) {
     lcd_send_string(bottom_text);
 
     update_temperature_timer = xTimerCreate("Temp Timer", pdMS_TO_TICKS(100000), pdTRUE, NULL, get_temperature_update);
+    ui_update_timer = xTimerCreate("UI Timer", pdMS_TO_TICKS(100), pdTRUE, NULL, get_ui_update);
     xTimerStart(update_temperature_timer, 100);
+    xTimerStart(ui_update_timer, 100);
+}
+
+void get_ui_update(TimerHandle_t xTimer) {
+    int button_id;
+    if (xQueueReceive(thermo_queue, &button_id, 0) == pdTRUE) {
+        if (button_id == SET_UP) {
+            user_setpoint++;
+        } else if (button_id == SET_DWN) {
+            user_setpoint--;
+        }
+        lcd_set_cursor(1, 0);
+        snprintf(top_text, sizeof(top_text), "%d   %d   %d", temp.indoor_temp, temp.outdoor_temp, user_setpoint);
+    }
 }
