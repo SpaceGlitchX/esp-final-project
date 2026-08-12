@@ -12,6 +12,7 @@ QueueHandle_t hvac_queue = NULL;
 // Global System Monitoring Variables
 hvac_state_t g_current_hvac_state = STATE_FAN_CIRCULATE;
 hvac_flt_t g_current_hvac_fault   = FLT_NONE;
+hvac_cmd_t g_current_hvac_cmd = STATE_IDLE;
 
 // Timer & Pacing Delay Handles
 static TimerHandle_t state_pacing_timer = NULL;
@@ -126,6 +127,8 @@ void hvac_state_machine_task(void *pvParameters) {
     while (1) {
         if (xQueueReceive(hvac_queue, &event, portMAX_DELAY) == pdTRUE) {
             
+            g_current_hvac_cmd = event;
+            
             // 1. GLOBAL EMERGENCY / OFF COMMAND
             if (event == CMD_OFF) {
                 safe_shutdown_actuators();
@@ -226,11 +229,4 @@ void hvac_state_machine_task(void *pvParameters) {
             }
         }
     }
-}
-
-void get_hvac_state(void) {
-    return (g_current_hvac_state);
-}
-void get_hvac_fault(void) {
-    return (g_current_hvac_fault);
 }

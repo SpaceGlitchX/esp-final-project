@@ -13,6 +13,7 @@ extern QueueHandle_t hvac_queue;
 // Exported globally for testing and monitoring
 extern hvac_state_t g_current_hvac_state;
 extern hvac_flt_t g_current_hvac_fault;
+extern hvac_cmd_t g_current_hvac_cmd
 
 /**
  * @brief Hardware Emergency Interrupt Handler
@@ -30,6 +31,4 @@ esp_err_t hvac_state_machine_init(void);
  */
 void hvac_state_machine_task(void *pvParameters);
 
-void get_hvac_state(void);
-void get_hvac_fault(void);
 #endif // HVAC_STATE_MACHINE_H

@@ -9,4 +9,5 @@ idf_component_register(
         sensors
         hardware
         unity
+        hvac_comms
 )

@@ -83,17 +83,17 @@ void init_hvac_hardware(void) {
  * @brief Getter and Setter functions
  */
 void set_heater_state(int level) {
-    gpio_set_level(HEATER_PIN, level level);
+    gpio_set_level(HEATER_PIN, level);
 }
 
 void set_fan_state(int level) {
     gpio_set_level(FAN_PIN, level);
 }
 
-int get_fan_state(void) {
+extern int get_fan_state(void) {
     return gpio_get_level(FAN_PIN);
 }
 
-int get_heater_state(void) {
+extern int get_heater_state(void) {
     return gpio_get_level(HEATER_PIN);
 }
