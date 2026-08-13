@@ -8,5 +8,5 @@ idf_component_register(
         esp_timer 
         sensors 
         driver      
-        esp_driver_gpio     # Depends on sensors component
+        esp_driver_gpio     
 )

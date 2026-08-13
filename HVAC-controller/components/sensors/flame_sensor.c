@@ -24,11 +24,11 @@ void flame_sensor_read(FlameSensor* self) {
 void flame_sensor_init(FlameSensor* self) {
     if (self == NULL) return;
 
-    // 1. Bind method pointers to this instance
+    // Bind method pointers to this instance
     self->init = flame_sensor_init;
     self->read = flame_sensor_read;
 
-    // 2. Configure ADC Oneshot Unit
+    // Configure ADC Oneshot Unit
     adc_oneshot_unit_init_cfg_t init_config = {
         .unit_id = ADC_UNIT,
     };
@@ -39,7 +39,7 @@ void flame_sensor_init(FlameSensor* self) {
         return;
     }
 
-    // 3. Configure ADC Channel Attenuation
+    // Configure ADC Channel Attenuation
     adc_oneshot_chan_cfg_t config = {
         .bitwidth = ADC_BITWIDTH_DEFAULT,
         .atten = ADC_ATTEN,

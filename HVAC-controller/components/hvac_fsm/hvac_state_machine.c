@@ -30,9 +30,7 @@ static void update_fault(hvac_flt_t fault) {
     g_current_hvac_fault = fault;
 }
 
-/**
- * @brief Safe emergency shutdown of all relays and sampling timers.
- */
+// Safe emergency shutdown of all relays and sampling timers.
 static void safe_shutdown_actuators(void) {
     set_heater_state(0);
     set_fan_state(0);
@@ -46,18 +44,14 @@ static void safe_shutdown_actuators(void) {
     if (tach_window_timer  != NULL) xTimerStop(tach_window_timer,  portMAX_DELAY);
 }
 
-/**
- * @brief Timer callback when inter-state delay expires.
- */
+// Timer callback when inter-state delay expires.
 static void state_delay_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     hvac_cmd_t cmd = CMD_STATE_DELAY_COMPLETE;
     xQueueSend(hvac_queue, &cmd, 0);
 }
 
-/**
- * @brief Initiates a non-blocking delay before moving to the next state.
- */
+// Initiates a non-blocking delay before moving to the next state.
 static void transition_with_delay(hvac_state_t target_state, uint32_t delay_ms) {
     g_next_pending_state = target_state;
     update_state(STATE_WAIT_DELAY);
@@ -66,9 +60,7 @@ static void transition_with_delay(hvac_state_t target_state, uint32_t delay_ms) 
     xTimerStart(state_pacing_timer, portMAX_DELAY);
 }
 
-/**
- * @brief Hardware Emergency Interrupt Handler
- */
+// Hardware Emergency Interrupt Handler
 void IRAM_ATTR fault_isr_handler(void *arg) {
     (void)arg;
     hvac_cmd_t cmd = CMD_OFF;
@@ -81,9 +73,7 @@ void IRAM_ATTR fault_isr_handler(void *arg) {
     }
 }
 
-/**
- * @brief Initializes queues, software timers, and initial states.
- */
+// Initializes queues, software timers, and initial states.
 esp_err_t hvac_state_machine_init(void) {
     ESP_LOGI(TAG, "Initializing HVAC State Machine...");
 
@@ -111,9 +101,7 @@ esp_err_t hvac_state_machine_init(void) {
     return ESP_OK;
 }
 
-/**
- * @brief Main HVAC Finite State Machine Task
- */
+// Main HVAC Finite State Machine Task
 void hvac_state_machine_task(void *pvParameters) {
     (void)pvParameters;
     hvac_cmd_t event;
@@ -125,7 +113,7 @@ void hvac_state_machine_task(void *pvParameters) {
             
             g_current_hvac_cmd = event;
             
-            // 1. GLOBAL EMERGENCY / OFF COMMAND
+            // GLOBAL EMERGENCY / OFF COMMAND
             if (event == CMD_OFF) {
                 safe_shutdown_actuators();
                 update_fault(FLT_NONE);
@@ -134,7 +122,7 @@ void hvac_state_machine_task(void *pvParameters) {
                 continue;
             }
 
-            // 2. INTER-STATE DELAY HANDLING
+            // INTER-STATE DELAY HANDLING
             if (g_current_hvac_state == STATE_WAIT_DELAY) {
                 if (event == CMD_STATE_DELAY_COMPLETE) {
                     hvac_state_t next = g_next_pending_state;
@@ -156,7 +144,7 @@ void hvac_state_machine_task(void *pvParameters) {
                 continue; 
             }
 
-            // 3. NORMAL EVENT SWITCH
+            // NORMAL EVENT SWITCH
             switch (g_current_hvac_state) {
 
                 case STATE_IDLE:

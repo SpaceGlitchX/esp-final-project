@@ -11,9 +11,7 @@ TimerHandle_t flame_proving_timer = NULL;
 TimerHandle_t fan_warmup_timer   = NULL;
 TimerHandle_t tach_window_timer  = NULL;
 
-/**
- * @brief Post event to FSM queue from FreeRTOS Timer Daemon context.
- */
+// Post event to FSM queue 
 static void install_event(hvac_cmd_t cmd) {
     if (hvac_queue != NULL) {
         if (xQueueSend(hvac_queue, &cmd, 0) != pdPASS) {
@@ -22,36 +20,28 @@ static void install_event(hvac_cmd_t cmd) {
     }
 }
 
-/**
- * @brief Callback function for flame proving timeout
- */
+// Callback function for flame proving timeout
 static void flame_proving_timeout_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     ESP_LOGW(TAG, "Safety Timer Expired: Flame Proving Timeout");
     install_event(CMD_FLAME_TIMEOUT);
 }
 
-/**
- * @brief Callback function for fan warmup completion
- */
+// Callback function for fan warmup completion
 static void warmup_done_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     ESP_LOGI(TAG, "Safety Timer Expired: Warmup Complete");
     install_event(CMD_WARMUP_DONE);
 }
 
-/**
- * @brief Callback function for tachometer timeout
- */
+// Callback function for tachometer timeout
 static void tach_timeout_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     ESP_LOGW(TAG, "Safety Timer Expired: Tachometer RPM Timeout");
     install_event(CMD_TACH_TIMEOUT);
 }
 
-/**
- * @brief Initialize the HVAC hardware, GPIO pins, and FreeRTOS safety timers
- */
+// Initialize the HVAC hardware, GPIO pins, and FreeRTOS safety timers
 extern void init_hvac_hardware(void) {
 
     gpio_set_level(HEATER_PIN, 0);
@@ -79,9 +69,7 @@ extern void init_hvac_hardware(void) {
     }
 }
 
-/**
- * @brief Getter and Setter functions
- */
+// Getter and Setter functions
 void set_heater_state(int level) {
     gpio_set_level(HEATER_PIN, level);
 }

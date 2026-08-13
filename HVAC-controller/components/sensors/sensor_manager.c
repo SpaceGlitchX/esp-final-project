@@ -13,10 +13,7 @@ extern TachSensor tach_sensor;
 // External PCNT unit handle from tach_sensor.c
 extern pcnt_unit_handle_t pcnt_unit;
 
-/**
- * @brief Callback function for analog flame sample timer
- */
-
+// Callback function for analog flame sample timer
  static void install_event(hvac_cmd_t cmd) {
     if (hvac_queue != NULL) {
         if (xQueueSend(hvac_queue, &cmd, 0) != pdPASS) {
@@ -34,9 +31,7 @@ static void analog_flame_check_callback(TimerHandle_t xTimer) {
     }
 }
 
-/**
- * @brief Callback function for tachometer sample timer
- */
+// Callback function for tachometer sample timer
 static void tach_monitor_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     if (tach_sensor.read != NULL) {
@@ -47,9 +42,7 @@ static void tach_monitor_callback(TimerHandle_t xTimer) {
     }
 }
 
-/**
- * @brief Initialize sensor hardware and FreeRTOS monitoring timers
- */
+// Initialize sensor hardware and FreeRTOS monitoring timers
 extern void sensor_manager_init(void) {
     if (flame_sensor.init != NULL) {
         flame_sensor.init(&flame_sensor);
@@ -82,9 +75,7 @@ extern void sensor_manager_init(void) {
     }
 }
 
-/**
- * @brief Start the flame proving monitor
- */
+// Start the flame proving monitor
 void start_flame_proving_monitor(void) {
     if (analog_sample_timer != NULL) {
         xTimerStart(analog_sample_timer, portMAX_DELAY);
@@ -92,9 +83,7 @@ void start_flame_proving_monitor(void) {
     }
 }
 
-/**
- * @brief Stop the flame proving monitor
- */
+// Stop the flame proving monitor
 void stop_flame_proving_monitor(void) {
     if (analog_sample_timer != NULL) {
         xTimerStop(analog_sample_timer, portMAX_DELAY);
@@ -102,9 +91,7 @@ void stop_flame_proving_monitor(void) {
     }
 }
 
-/**
- * @brief Start tachometer monitoring and hardware pulse counter
- */
+// Start tachometer monitoring and hardware pulse counter
 void start_tach_monitoring(void) {
     if (pcnt_unit != NULL) {
         pcnt_unit_start(pcnt_unit);
@@ -115,9 +102,7 @@ void start_tach_monitoring(void) {
     }
 }
 
-/**
- * @brief Stop tachometer monitoring and hardware pulse counter
- */
+// Stop tachometer monitoring and hardware pulse counter
 void stop_tach_monitoring(void) {
     if (pcnt_unit != NULL) {
         pcnt_unit_stop(pcnt_unit);

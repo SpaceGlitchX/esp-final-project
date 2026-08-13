@@ -28,5 +28,4 @@ void stop_flame_proving_monitor(void);
 void start_tach_monitoring(void);
 void stop_tach_monitoring(void);
 
-
 #endif
