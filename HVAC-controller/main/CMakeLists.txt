@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS 
-        "KY-026.c"
+        
+        "hvac_test_commands.c"
         
     INCLUDE_DIRS 
         "."
@@ -17,4 +18,5 @@ idf_component_register(
         esp_timer
         freertos
         esp_driver_pcnt
+        console
 )
