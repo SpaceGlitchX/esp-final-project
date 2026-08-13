@@ -50,7 +50,7 @@ static void tach_monitor_callback(TimerHandle_t xTimer) {
 /**
  * @brief Initialize sensor hardware and FreeRTOS monitoring timers
  */
-void sensor_manager_init(void) {
+extern void sensor_manager_init(void) {
     if (flame_sensor.init != NULL) {
         flame_sensor.init(&flame_sensor);
     }

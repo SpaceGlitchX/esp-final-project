@@ -43,7 +43,7 @@ typedef struct
 } hvac_status_packet_t;
 
 
-void uart_setup(void);
+extern void uart_setup(void);
 
 
 bool unpack_thermostat_packet(

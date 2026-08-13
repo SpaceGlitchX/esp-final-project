@@ -52,7 +52,7 @@ static void tach_timeout_callback(TimerHandle_t xTimer) {
 /**
  * @brief Initialize the HVAC hardware, GPIO pins, and FreeRTOS safety timers
  */
-void init_hvac_hardware(void) {
+extern void init_hvac_hardware(void) {
 
     gpio_set_level(HEATER_PIN, 0);
     gpio_set_level(FAN_PIN, 0);

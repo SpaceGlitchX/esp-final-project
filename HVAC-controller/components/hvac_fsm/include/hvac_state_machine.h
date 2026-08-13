@@ -24,7 +24,7 @@ void fault_isr_handler(void *arg);
  * @brief Initializes state variables, queues, and timer resources.
  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure.
  */
-esp_err_t hvac_state_machine_init(void);
+extern esp_err_t hvac_state_machine_init(void);
 
 /**
  * @brief Main HVAC Finite State Machine Task
