@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS 
-        "KY-026.c"
+        "LCD.c"
         
     INCLUDE_DIRS 
         "."
