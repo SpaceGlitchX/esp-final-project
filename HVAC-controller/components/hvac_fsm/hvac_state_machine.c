@@ -226,3 +226,10 @@ void hvac_state_machine_task(void *pvParameters) {
         }
     }
 }
+
+hvac_state_t get_hvac_state(void) {
+    return (g_current_hvac_state);
+}
+hvac_flt_t get_hvac_fault(void) {
+    return (g_current_hvac_fault);
+}
