@@ -3,8 +3,10 @@
 
 #include <string.h>
 
-#include "esp_log.h"
 #include "driver/uart.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -13,12 +15,10 @@
 static const char *TAG = "HVAC_COMMS";
 
 
-/*
- * Calculate an XOR checksum over a buffer.
- *
- * The checksum is calculated over all packet bytes
- * except the final checksum byte.
- */
+/* ============================================================
+ * Checksum
+ * ============================================================ */
+
 static uint8_t calculate_checksum(
     const uint8_t *buffer,
     size_t length)
@@ -34,9 +34,10 @@ static uint8_t calculate_checksum(
 }
 
 
-/*
- * Initialize UART communication.
- */
+/* ============================================================
+ * UART Initialization
+ * ============================================================ */
+
 void uart_setup(void)
 {
     uart_config_t uart_config =
@@ -49,9 +50,7 @@ void uart_setup(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    /*
-     * Install UART driver.
-     */
+    // Install UART driver.
     ESP_ERROR_CHECK(
         uart_driver_install(
             UART_PORT,
@@ -63,9 +62,7 @@ void uart_setup(void)
         )
     );
 
-    /*
-     * Configure UART parameters.
-     */
+    // Configure UART parameters.
     ESP_ERROR_CHECK(
         uart_param_config(
             UART_PORT,
@@ -73,9 +70,7 @@ void uart_setup(void)
         )
     );
 
-    /*
-     * Configure UART pins.
-     */
+    // Configure UART pins.
     ESP_ERROR_CHECK(
         uart_set_pin(
             UART_PORT,
@@ -88,7 +83,8 @@ void uart_setup(void)
 
     ESP_LOGI(
         TAG,
-        "UART setup successful: RX pin %d, TX pin %d, baud rate %d",
+        "UART initialized: port=%d RX=%d TX=%d baud=%d",
+        UART_PORT,
         RX_PIN,
         TX_PIN,
         UART_BAUD_RATE
@@ -96,22 +92,32 @@ void uart_setup(void)
 }
 
 
+/* ============================================================
+ * Thermostat Packet RX
+ * ============================================================ */
+
 /*
- * Unpack and validate a thermostat packet.
- *
  * Thermostat packet format:
  *
- * BYTE 0     HVAC command
- * BYTES 1-4  Timestamp
- * BYTE 5     Checksum
+ * BYTE 0       HVAC command
+ * BYTES 1-4    Timestamp
+ * BYTE 5       Checksum
  *
- * Total packet size = 6 bytes
+ * Total = 6 bytes
  */
 bool unpack_thermostat_packet(
     thermostat_packet_t *data,
     const uint8_t *buffer)
 {
-    uint8_t calculated_checksum;
+    if (data == NULL || buffer == NULL)
+    {
+        ESP_LOGE(
+            TAG,
+            "NULL pointer passed to unpack_thermostat_packet"
+        );
+
+        return false;
+    }
 
     /*
      * BYTE 0:
@@ -136,50 +142,68 @@ bool unpack_thermostat_packet(
      */
     data->checksum = buffer[5];
 
-    /*
-     * Calculate checksum using bytes 0-4.
-     */
-    calculated_checksum =
+    // Calculate checksum using bytes 0-4.
+    uint8_t calculated_checksum =
         calculate_checksum(
             buffer,
             5
         );
 
-    /*
-     * Validate checksum.
-     */
-    if (calculated_checksum == data->checksum)
+    // Validate checksum.
+    if (calculated_checksum != data->checksum)
     {
-        return true;
+        ESP_LOGE(
+            TAG,
+            "Thermostat packet checksum error "
+            "(received=0x%02X calculated=0x%02X)",
+            data->checksum,
+            calculated_checksum
+        );
+
+        return false;
     }
 
-    ESP_LOGE(
+    ESP_LOGD(
         TAG,
-        "Thermostat packet checksum error"
+        "Thermostat packet valid: command=%d timestamp=%lu",
+        data->thermostat_cmd,
+        (unsigned long)data->timestamp_us
     );
 
-    return false;
+    return true;
 }
 
 
+/* ============================================================
+ * HVAC Status Packet TX
+ * ============================================================ */
+
 /*
- * Pack the current HVAC status into a UART packet.
- *
  * HVAC status packet format:
  *
- * BYTE 0     HVAC state
- * BYTE 1     Fault
- * BYTE 2     Fan state
- * BYTE 3     Heater state
- * BYTES 4-7 Timestamp
- * BYTE 8     Checksum
+ * BYTE 0       Current HVAC state
+ * BYTE 1       Current fault
+ * BYTE 2       Fan state
+ * BYTE 3       Heater state
+ * BYTES 4-7    Timestamp
+ * BYTE 8       Checksum
  *
- * Total packet size = 9 bytes.
+ * Total = 9 bytes
  */
 void pack_hvac_status_packet(
     hvac_status_packet_t *data,
     uint8_t *buffer)
 {
+    if (data == NULL || buffer == NULL)
+    {
+        ESP_LOGE(
+            TAG,
+            "NULL pointer passed to pack_hvac_status_packet"
+        );
+
+        return;
+    }
+
     /*
      * BYTE 0:
      * Current HVAC state.
@@ -211,12 +235,23 @@ void pack_hvac_status_packet(
     /*
      * BYTES 4-7:
      * Timestamp.
+     *
+     * esp_timer_get_time() returns microseconds.
      */
+    uint32_t timestamp_us =
+        (uint32_t)esp_timer_get_time();
+
     memcpy(
         &buffer[4],
-        &data->(uint32_t)(esp_timer_get_time()/1000);
-        sizeof(data->timestamp_us)
+        &timestamp_us,
+        sizeof(timestamp_us)
     );
+
+    /*
+     * Store timestamp in the packet structure.
+     */
+    data->timestamp_us =
+        timestamp_us;
 
     /*
      * BYTE 8:
@@ -228,20 +263,25 @@ void pack_hvac_status_packet(
             8
         );
 
-    data->checksum = buffer[8];
+    data->checksum =
+        buffer[8];
 }
 
 
-/*
- * Send a packet over UART.
- */
+/* ============================================================
+ * UART TX
+ * ============================================================ */
+
 int uart_send(
     uint8_t *buffer,
     size_t length)
 {
-    int bytes_written;
+    if (buffer == NULL || length == 0)
+    {
+        return -1;
+    }
 
-    bytes_written =
+    int bytes_written =
         uart_write_bytes(
             UART_PORT,
             buffer,
@@ -254,22 +294,34 @@ int uart_send(
             TAG,
             "UART transmission failed"
         );
+
+        return bytes_written;
     }
+
+    ESP_LOGD(
+        TAG,
+        "UART transmitted %d bytes",
+        bytes_written
+    );
 
     return bytes_written;
 }
 
 
-/*
- * Receive data from UART.
- *
- * timeout_ms specifies how long to wait for data.
- */
+/* ============================================================
+ * UART RX
+ * ============================================================ */
+
 int uart_receive(
     uint8_t *buffer,
     size_t length,
     uint32_t timeout_ms)
 {
+    if (buffer == NULL || length == 0)
+    {
+        return -1;
+    }
+
     return uart_read_bytes(
         UART_PORT,
         buffer,
@@ -279,34 +331,27 @@ int uart_receive(
 }
 
 
-/*
- * UART receive task.
- *
- * This task waits for thermostat packets,
- * validates them, and sends valid commands
- * to the HVAC state machine queue.
- */
+/* ============================================================
+ * UART Receive Task
+ * ============================================================ */
+
 void hvac_uart_receive_task(
     void *pvParameters)
 {
     (void)pvParameters;
 
-    /*
-     * Thermostat packet is 6 bytes:
-     *
-     * Command     = 1 byte
-     * Timestamp   = 4 bytes
-     * Checksum    = 1 byte
-     */
     uint8_t buffer[6];
 
     thermostat_packet_t packet;
 
+    ESP_LOGI(
+        TAG,
+        "HVAC UART receive task started"
+    );
+
     while (1)
     {
-        /*
-         * Wait for a complete thermostat packet.
-         */
+        // Wait for a complete thermostat packet. Timeout = 100 ms.
         int bytes_received =
             uart_receive(
                 buffer,
@@ -314,30 +359,24 @@ void hvac_uart_receive_task(
                 100
             );
 
-        /*
-         * Complete packet received.
-         */
         if (bytes_received == sizeof(buffer))
         {
-            /*
-             * Validate and unpack packet.
-             */
+            
+            // Validate and unpack packet.
             if (unpack_thermostat_packet(
                     &packet,
                     buffer))
             {
                 ESP_LOGI(
                     TAG,
-                    "Received thermostat command: %d",
+                    "Thermostat command received: %d",
                     packet.thermostat_cmd
                 );
 
-                /*
-                 * Send the command to the
-                 * HVAC state machine queue.
-                 */
                 if (hvac_queue != NULL)
                 {
+                    
+                    // Send the command to the FSM.
                     BaseType_t result =
                         xQueueSend(
                             hvac_queue,
@@ -352,36 +391,32 @@ void hvac_uart_receive_task(
                             "HVAC command queue full"
                         );
                     }
+                    else
+                    {
+                        ESP_LOGD(
+                            TAG,
+                            "Command sent to HVAC FSM"
+                        );
+                    }
                 }
                 else
                 {
                     ESP_LOGE(
                         TAG,
-                        "HVAC command queue is NULL"
+                        "HVAC queue is NULL"
                     );
                 }
             }
         }
-
-        /*
-         * Some data was received, but it was
-         * not a complete packet.
-         */
         else if (bytes_received > 0)
         {
             ESP_LOGW(
                 TAG,
-                "Incomplete packet: %d/%d bytes",
+                "Incomplete thermostat packet: "
+                "%d/%d bytes",
                 bytes_received,
                 sizeof(buffer)
             );
         }
-
-        /*
-         * Allow other FreeRTOS tasks to run.
-         */
-        vTaskDelay(
-            pdMS_TO_TICKS(10)
-        );
     }
 }

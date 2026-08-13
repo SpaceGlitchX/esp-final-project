@@ -96,11 +96,7 @@ esp_err_t hvac_state_machine_init(void) {
     }
 
     if (state_pacing_timer == NULL) {
-        state_pacing_timer = xTimerCreate("StatePacingTimer", 
-                                          pdMS_TO_TICKS(4000), 
-                                          pdFALSE, 
-                                          NULL, 
-                                          state_delay_callback);
+        state_pacing_timer = xTimerCreate("StatePacingTimer", pdMS_TO_TICKS(4000), pdFALSE, NULL, state_delay_callback);
         if (state_pacing_timer == NULL) {
             ESP_LOGE(TAG, "Failed to create inter-state delay timer!");
             return ESP_FAIL;

@@ -1,7 +1,9 @@
 #include "data_logger.h"
 
 static const char *TAG = "DATA_LOGGER";
+
 static QueueHandle_t logger_queue = NULL;
+static TimerHandle_t log_timer = NULL;
 
 void data_logger_init(void) {
     logger_queue = xQueueCreate(10, sizeof(log_msg_t));
@@ -41,7 +43,7 @@ static void log_timer_callback(TimerHandle_t xTimer) {
     }
 }
 
-static void data_logger_write(const hvac_log_data_t *data) {
+static void data_logger_write(const hvac_log_data_t *data, log_event_type_t type) {
 
     if (data == NULL) {
         return;
@@ -72,29 +74,33 @@ static void data_logger_write(const hvac_log_data_t *data) {
         timeinfo.tm_min,
         timeinfo.tm_sec,
 
-        
         (int)state,
         (int)fault,
         fan_state,
         heater_state,
         flame_value,
         fan_rpm,
+        (int)type
+
     );
 }
 
 void data_logger_task(hvac_log_data_t *log_data) {
 
+    log_msg_t msg;
 
-
-        
-        
-        data_logger_log(&log_data);
-
+    while (1) {
+        if (xQueueReceive(logger_queue, &msg, portMAX_DELAY) == pdTRUE) {
+            hvac_log_data_t data;
+            collect_log_data(&data);
+            data_logger_write(&data, msg.type);
+        }
     }
+}
 
-    void data_logger_log_event(log_event_type_t type) {
+void data_logger_log_event(log_event_type_t type) {
 
-        log_message_t = msg;
-        msg.type = type;
-        xQueueSend(logger_queue, &message, 0);
-    }
+    log_message_t = msg;
+    msg.type = type;
+    xQueueSend(logger_queue, &message, 0);
+}

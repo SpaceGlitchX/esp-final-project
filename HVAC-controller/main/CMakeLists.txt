@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS 
-        "main.c"
+        "KY-026.c"
         
     INCLUDE_DIRS 
         "."
@@ -9,5 +9,12 @@ idf_component_register(
         sensors
         hardware
         unity
+        
         hvac_comms
+        esp_adc
+        esp_driver_ledc
+        esp_driver_gpio
+        esp_timer
+        freertos
+        esp_driver_pcnt
 )

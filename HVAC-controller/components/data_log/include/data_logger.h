@@ -30,7 +30,9 @@ typedef struct {
 } log_msg_t;
 
 void data_logger_init(void);
-void data_logger_log(const hvac_log_data_t *data);
-
-
+static void data_logger_write(const hvac_log_data_t *data, log_event_type_t type);
+static void log_timer_callback(TimerHandle_t xTimer);
+static void collect_log_data(hvac_log_data_t *data);
+void data_logger_task(hvac_log_data_t *log_data);
+void data_logger_log_event(log_event_type_t type); 
 #endif

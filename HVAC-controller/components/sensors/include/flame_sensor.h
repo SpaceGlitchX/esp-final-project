@@ -4,7 +4,7 @@
 #include "esp_log.h"
 
 #define ADC_UNIT    ADC_UNIT_1
-#define ADC_CHAN    ADC_CHANNEL_3 // Pin 34
+#define ADC_CHAN    ADC_CHANNEL_6 // Pin 34
 #define ADC_ATTEN   ADC_ATTEN_DB_12
 
 typedef struct FlameSensor {

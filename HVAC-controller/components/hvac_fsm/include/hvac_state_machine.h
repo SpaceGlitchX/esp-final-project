@@ -13,7 +13,7 @@ extern QueueHandle_t hvac_queue;
 // Exported globally for testing and monitoring
 extern hvac_state_t g_current_hvac_state;
 extern hvac_flt_t g_current_hvac_fault;
-extern hvac_cmd_t g_current_hvac_cmd
+extern hvac_cmd_t g_current_hvac_cmd;
 
 /**
  * @brief Hardware Emergency Interrupt Handler
