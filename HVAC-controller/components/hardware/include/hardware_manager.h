@@ -9,7 +9,7 @@
 #include "esp_log.h"
 
 // Hardware pins
-#define HEATER_PIN 18
+#define HEATER_PIN 19
 #define FAN_PIN 25
 
 // Queue and timer handles

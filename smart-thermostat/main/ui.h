@@ -18,4 +18,6 @@ extern void ui_init(void);
 char top_text[16];
 char bottom_text[16];
 
+void get_ui_update(TimerHandle_t xTimer);
+
 #endif
