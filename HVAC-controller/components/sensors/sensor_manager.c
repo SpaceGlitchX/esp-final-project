@@ -16,10 +16,21 @@ extern pcnt_unit_handle_t pcnt_unit;
 /**
  * @brief Callback function for analog flame sample timer
  */
+
+ static void install_event(hvac_cmd_t cmd) {
+    if (hvac_queue != NULL) {
+        if (xQueueSend(hvac_queue, &cmd, 0) != pdPASS) {
+            ESP_LOGE(TAG, "HVAC Event Queue Full! Dropped CMD: %d", cmd);
+        }
+    }
+}
 static void analog_flame_check_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     if (flame_sensor.read != NULL) {
         flame_sensor.read(&flame_sensor);
+    }
+    if (flame_sensor.value < 20) {
+        install_event(CMD_FLAME_DETECTED);
     }
 }
 
@@ -30,6 +41,9 @@ static void tach_monitor_callback(TimerHandle_t xTimer) {
     (void)xTimer;
     if (tach_sensor.read != NULL) {
         tach_sensor.read(&tach_sensor);
+    }
+    if (tach_sensor.fan_rpm > 1200) {
+       install_event(CMD_FAN_OK);
     }
 }
 

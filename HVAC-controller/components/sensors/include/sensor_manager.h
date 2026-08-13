@@ -10,6 +10,7 @@
 #include "driver/pulse_cnt.h"
 #include "esp_log.h"
 #include <stdio.h>
+#include "hvac_state_machine.h"
 
 // Timer handles (external reference)
 extern TimerHandle_t analog_sample_timer;

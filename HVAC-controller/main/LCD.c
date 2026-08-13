@@ -1,212 +1,481 @@
-
 #include <stdio.h>
 #include <stdint.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "driver/i2c.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_err.h"
 
 static const char *TAG = "LCD1602";
 
 /* =========================================================
- * I2C CONFIGURATION
+ * LCD PIN CONFIGURATION
  * ========================================================= */
 
-#define I2C_MASTER_NUM          I2C_NUM_0
+/*
+ * LCD:
+ *
+ * RS  -> GPIO 25
+ * R/W -> GND
+ * E   -> GPIO 26
+ *
+ * D4  -> GPIO 27
+ * D5  -> GPIO 14
+ * D6  -> GPIO 12
+ * D7  -> GPIO 13
+ */
 
-#define I2C_MASTER_SDA_IO       GPIO_NUM_21
-#define I2C_MASTER_SCL_IO       GPIO_NUM_22
+#define LCD_RS      GPIO_NUM_25
+#define LCD_EN      GPIO_NUM_26
 
-#define I2C_MASTER_FREQ_HZ      100000
+#define LCD_D4      GPIO_NUM_27
+#define LCD_D5      GPIO_NUM_14
+#define LCD_D6      GPIO_NUM_12
+#define LCD_D7      GPIO_NUM_13
 
-#define I2C_MASTER_RX_BUF_DISABLE   0
-#define I2C_MASTER_TX_BUF_DISABLE   0
 
 /* =========================================================
- * LCD CONFIGURATION
+ * LCD COMMANDS
  * ========================================================= */
 
-/*
- * Change this if your LCD uses a different I2C address.
- *
- * Common addresses:
- *     0x27
- *     0x3F
- */
-#define LCD_I2C_ADDRESS         0x27
+#define LCD_CLEAR_DISPLAY       0x01
+#define LCD_RETURN_HOME         0x02
 
-/*
- * Control bytes.
- *
- * These are for the LCD's I2C interface.
- */
-#define LCD_CONTROL_COMMAND     0x00
-#define LCD_CONTROL_DATA        0x40
+#define LCD_ENTRY_MODE_SET      0x06
 
-/*
- * LCD commands
- */
-#define LCD_CMD_CLEAR_DISPLAY   0x01
-#define LCD_CMD_RETURN_HOME     0x02
-#define LCD_CMD_ENTRY_MODE_SET  0x06
-#define LCD_CMD_DISPLAY_CONTROL 0x0C
-#define LCD_CMD_FUNCTION_SET    0x38
+#define LCD_DISPLAY_OFF        0x08
+#define LCD_DISPLAY_ON         0x0C
+
+#define LCD_CURSOR_ON           0x0E
+#define LCD_CURSOR_BLINK        0x0F
+
+#define LCD_FUNCTION_SET        0x28
+
+#define LCD_SET_DDRAM           0x80
+
 
 /* =========================================================
- * I2C INITIALIZATION
+ * GPIO INITIALIZATION
  * ========================================================= */
 
-esp_err_t i2c_master_init(void)
+static void lcd_gpio_init(void)
 {
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
+    /*
+     * Configure RS and E.
+     */
 
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+    gpio_config_t output_config = {
+        .pin_bit_mask =
+            (1ULL << LCD_RS) |
+            (1ULL << LCD_EN) |
+            (1ULL << LCD_D4) |
+            (1ULL << LCD_D5) |
+            (1ULL << LCD_D6) |
+            (1ULL << LCD_D7),
 
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .mode = GPIO_MODE_OUTPUT,
 
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+
+        .intr_type = GPIO_INTR_DISABLE
     };
 
-    esp_err_t err;
-
-    err = i2c_param_config(
-        I2C_MASTER_NUM,
-        &conf
+    ESP_ERROR_CHECK(
+        gpio_config(&output_config)
     );
 
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(
-            TAG,
-            "I2C parameter configuration failed: %s",
-            esp_err_to_name(err)
-        );
+    /*
+     * Start with everything LOW.
+     */
 
-        return err;
-    }
+    gpio_set_level(LCD_RS, 0);
+    gpio_set_level(LCD_EN, 0);
 
-    err = i2c_driver_install(
-        I2C_MASTER_NUM,
-        conf.mode,
-        I2C_MASTER_RX_BUF_DISABLE,
-        I2C_MASTER_TX_BUF_DISABLE,
-        0
-    );
-
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(
-            TAG,
-            "I2C driver installation failed: %s",
-            esp_err_to_name(err)
-        );
-
-        return err;
-    }
+    gpio_set_level(LCD_D4, 0);
+    gpio_set_level(LCD_D5, 0);
+    gpio_set_level(LCD_D6, 0);
+    gpio_set_level(LCD_D7, 0);
 
     ESP_LOGI(
         TAG,
-        "I2C initialized: SDA=%d, SCL=%d, Frequency=%d Hz",
-        I2C_MASTER_SDA_IO,
-        I2C_MASTER_SCL_IO,
-        I2C_MASTER_FREQ_HZ
+        "LCD GPIO initialized"
+    );
+}
+
+
+/* =========================================================
+ * SET DATA PINS
+ * ========================================================= */
+
+static void lcd_set_data_pins(
+    uint8_t data
+)
+{
+    gpio_set_level(
+        LCD_D4,
+        (data >> 0) & 0x01
     );
 
-    return ESP_OK;
+    gpio_set_level(
+        LCD_D5,
+        (data >> 1) & 0x01
+    );
+
+    gpio_set_level(
+        LCD_D6,
+        (data >> 2) & 0x01
+    );
+
+    gpio_set_level(
+        LCD_D7,
+        (data >> 3) & 0x01
+    );
 }
 
+
 /* =========================================================
- * SEND LCD COMMAND
+ * ENABLE PULSE
  * ========================================================= */
 
-void lcd_send_command(uint8_t cmd)
+static void lcd_enable_pulse(void)
 {
-    uint8_t write_buf[2];
+    /*
+     * Enable HIGH.
+     */
 
-    write_buf[0] = LCD_CONTROL_COMMAND;
-    write_buf[1] = cmd;
+    gpio_set_level(
+        LCD_EN,
+        1
+    );
 
-    esp_err_t err =
-        i2c_master_write_to_device(
-            I2C_MASTER_NUM,
-            LCD_I2C_ADDRESS,
-            write_buf,
-            sizeof(write_buf),
-            pdMS_TO_TICKS(1000)
-        );
+    /*
+     * Short enable pulse.
+     */
 
-    if (err != ESP_OK)
+    esp_rom_delay_us(1);
+
+    /*
+     * Enable LOW.
+     */
+
+    gpio_set_level(
+        LCD_EN,
+        0
+    );
+
+    /*
+     * Allow LCD to process data.
+     */
+
+    esp_rom_delay_us(50);
+}
+
+
+/* =========================================================
+ * WRITE 4-BIT NIBBLE
+ * ========================================================= */
+
+static void lcd_write_nibble(
+    uint8_t nibble
+)
+{
+    /*
+     * Put nibble onto D4-D7.
+     */
+
+    lcd_set_data_pins(
+        nibble & 0x0F
+    );
+
+    /*
+     * Pulse E.
+     */
+
+    lcd_enable_pulse();
+}
+
+
+/* =========================================================
+ * SEND COMMAND
+ * ========================================================= */
+
+static void lcd_command(
+    uint8_t command
+)
+{
+    /*
+     * RS = 0
+     *
+     * This means command.
+     */
+
+    gpio_set_level(
+        LCD_RS,
+        0
+    );
+
+    /*
+     * Send upper nibble.
+     */
+
+    lcd_write_nibble(
+        (command >> 4) & 0x0F
+    );
+
+    /*
+     * Send lower nibble.
+     */
+
+    lcd_write_nibble(
+        command & 0x0F
+    );
+
+    /*
+     * Clear and home commands take
+     * longer to execute.
+     */
+
+    if (
+        command == LCD_CLEAR_DISPLAY ||
+        command == LCD_RETURN_HOME
+    )
     {
-        ESP_LOGE(
-            TAG,
-            "LCD command transfer failed: %s",
-            esp_err_to_name(err)
+        vTaskDelay(
+            pdMS_TO_TICKS(2)
         );
+    }
+    else
+    {
+        esp_rom_delay_us(50);
     }
 }
 
+
 /* =========================================================
- * SEND LCD DATA
+ * SEND DATA / CHARACTER
  * ========================================================= */
 
-void lcd_send_data(uint8_t data)
+static void lcd_data(
+    uint8_t data
+)
 {
-    uint8_t write_buf[2];
+    /*
+     * RS = 1
+     *
+     * This means character data.
+     */
 
-    write_buf[0] = LCD_CONTROL_DATA;
-    write_buf[1] = data;
+    gpio_set_level(
+        LCD_RS,
+        1
+    );
 
-    esp_err_t err =
-        i2c_master_write_to_device(
-            I2C_MASTER_NUM,
-            LCD_I2C_ADDRESS,
-            write_buf,
-            sizeof(write_buf),
-            pdMS_TO_TICKS(1000)
-        );
+    /*
+     * Upper nibble.
+     */
 
-    if (err != ESP_OK)
+    lcd_write_nibble(
+        (data >> 4) & 0x0F
+    );
+
+    /*
+     * Lower nibble.
+     */
+
+    lcd_write_nibble(
+        data & 0x0F
+    );
+}
+
+
+/* =========================================================
+ * SEND STRING
+ * ========================================================= */
+
+static void lcd_string(
+    const char *string
+)
+{
+    if (string == NULL)
     {
-        ESP_LOGE(
-            TAG,
-            "LCD data transfer failed: %s",
-            esp_err_to_name(err)
+        return;
+    }
+
+    while (*string)
+    {
+        lcd_data(
+            (uint8_t)*string
         );
+
+        string++;
     }
 }
+
+
+/* =========================================================
+ * CLEAR LCD
+ * ========================================================= */
+
+static void lcd_clear(void)
+{
+    lcd_command(
+        LCD_CLEAR_DISPLAY
+    );
+
+    vTaskDelay(
+        pdMS_TO_TICKS(2)
+    );
+}
+
+
+/* =========================================================
+ * SET CURSOR
+ * ========================================================= */
+
+static void lcd_set_cursor(
+    uint8_t row,
+    uint8_t column
+)
+{
+    uint8_t address;
+
+    /*
+     * 1602A DDRAM addresses:
+     *
+     * Row 0 = 0x00
+     * Row 1 = 0x40
+     */
+
+    if (row == 0)
+    {
+        address = 0x00 + column;
+    }
+    else
+    {
+        address = 0x40 + column;
+    }
+
+    lcd_command(
+        LCD_SET_DDRAM | address
+    );
+}
+
 
 /* =========================================================
  * LCD INITIALIZATION
  * ========================================================= */
 
-void lcd_init(void)
+static void lcd_init(void)
 {
+    ESP_LOGI(
+        TAG,
+        "Starting LCD initialization..."
+    );
+
     /*
-     * Allow LCD controller to power up.
+     * LCD needs time after power-up.
      */
+
     vTaskDelay(
         pdMS_TO_TICKS(50)
     );
 
     /*
-     * Function set:
-     *
-     * 8-bit
-     * 2-line
-     * 5x8 character font
+     * RS LOW.
      */
-    lcd_send_command(
-        LCD_CMD_FUNCTION_SET
+
+    gpio_set_level(
+        LCD_RS,
+        0
     );
+
+    /*
+     * E LOW.
+     */
+
+    gpio_set_level(
+        LCD_EN,
+        0
+    );
+
+    /*
+     * -----------------------------------------------------
+     * HD44780 INITIALIZATION
+     * -----------------------------------------------------
+     *
+     * The controller powers up expecting 8-bit mode.
+     *
+     * We send the special initialization sequence
+     * to switch it into 4-bit mode.
+     */
+
+    lcd_write_nibble(0x03);
 
     vTaskDelay(
         pdMS_TO_TICKS(5)
+    );
+
+    lcd_write_nibble(0x03);
+
+    vTaskDelay(
+        pdMS_TO_TICKS(5)
+    );
+
+    lcd_write_nibble(0x03);
+
+    vTaskDelay(
+        pdMS_TO_TICKS(1)
+    );
+
+    /*
+     * Switch to 4-bit mode.
+     */
+
+    lcd_write_nibble(0x02);
+
+    vTaskDelay(
+        pdMS_TO_TICKS(1)
+    );
+
+    /*
+     * 4-bit mode
+     * 2 lines
+     * 5x8 font
+     */
+
+    lcd_command(
+        LCD_FUNCTION_SET
+    );
+
+    /*
+     * Display OFF.
+     */
+
+    lcd_command(
+        LCD_DISPLAY_OFF
+    );
+
+    /*
+     * Clear display.
+     */
+
+    lcd_command(
+        LCD_CLEAR_DISPLAY
+    );
+
+    /*
+     * Entry mode:
+     *
+     * Cursor increments.
+     * Display does not shift.
+     */
+
+    lcd_command(
+        LCD_ENTRY_MODE_SET
     );
 
     /*
@@ -214,35 +483,9 @@ void lcd_init(void)
      * Cursor OFF
      * Blink OFF
      */
-    lcd_send_command(
-        LCD_CMD_DISPLAY_CONTROL
-    );
 
-    vTaskDelay(
-        pdMS_TO_TICKS(5)
-    );
-
-    /*
-     * Clear display.
-     */
-    lcd_send_command(
-        LCD_CMD_CLEAR_DISPLAY
-    );
-
-    vTaskDelay(
-        pdMS_TO_TICKS(5)
-    );
-
-    /*
-     * Entry mode:
-     * Increment cursor after each character.
-     */
-    lcd_send_command(
-        LCD_CMD_ENTRY_MODE_SET
-    );
-
-    vTaskDelay(
-        pdMS_TO_TICKS(5)
+    lcd_command(
+        LCD_DISPLAY_ON
     );
 
     ESP_LOGI(
@@ -251,72 +494,6 @@ void lcd_init(void)
     );
 }
 
-/* =========================================================
- * SET LCD CURSOR
- * ========================================================= */
-
-void lcd_set_cursor(
-    uint8_t row,
-    uint8_t col
-)
-{
-    uint8_t address;
-
-    if (row == 0)
-    {
-        address = 0x00 + col;
-    }
-    else
-    {
-        address = 0x40 + col;
-    }
-
-    lcd_send_command(
-        0x80 | address
-    );
-}
-
-/* =========================================================
- * SEND STRING
- * ========================================================= */
-
-void lcd_send_string(
-    const char *str
-)
-{
-    if (str == NULL)
-    {
-        return;
-    }
-
-    while (*str)
-    {
-        lcd_send_data(
-            (uint8_t)*str
-        );
-
-        str++;
-    }
-}
-
-/* =========================================================
- * CLEAR LCD
- * ========================================================= */
-
-void lcd_clear(void)
-{
-    lcd_send_command(
-        LCD_CMD_CLEAR_DISPLAY
-    );
-
-    /*
-     * Clear display requires a little
-     * more processing time.
-     */
-    vTaskDelay(
-        pdMS_TO_TICKS(5)
-    );
-}
 
 /* =========================================================
  * LCD TEST
@@ -326,12 +503,15 @@ static void lcd_test(void)
 {
     ESP_LOGI(
         TAG,
-        "Starting LCD test..."
+        "Running LCD test..."
     );
 
     /*
-     * Test 1
+     * -----------------------------------------------------
+     * TEST 1
+     * -----------------------------------------------------
      */
+
     lcd_clear();
 
     lcd_set_cursor(
@@ -339,7 +519,7 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
+    lcd_string(
         "LCD TEST"
     );
 
@@ -348,17 +528,21 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
-        "I2C WORKING!"
+    lcd_string(
+        "ESP32 WORKING!"
     );
 
     vTaskDelay(
         pdMS_TO_TICKS(3000)
     );
 
+
     /*
-     * Test 2
+     * -----------------------------------------------------
+     * TEST 2
+     * -----------------------------------------------------
      */
+
     lcd_clear();
 
     lcd_set_cursor(
@@ -366,8 +550,8 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
-        "ESP32"
+    lcd_string(
+        "1602A LCD"
     );
 
     lcd_set_cursor(
@@ -375,17 +559,21 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
-        "LCD1602 TEST"
+    lcd_string(
+        "4-BIT MODE"
     );
 
     vTaskDelay(
         pdMS_TO_TICKS(3000)
     );
 
+
     /*
-     * Test 3
+     * -----------------------------------------------------
+     * TEST 3
+     * -----------------------------------------------------
      */
+
     lcd_clear();
 
     lcd_set_cursor(
@@ -393,8 +581,8 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
-        "Row 1: PASS"
+    lcd_string(
+        "ROW 1: PASS"
     );
 
     lcd_set_cursor(
@@ -402,8 +590,8 @@ static void lcd_test(void)
         0
     );
 
-    lcd_send_string(
-        "Row 2: PASS"
+    lcd_string(
+        "ROW 2: PASS"
     );
 
     ESP_LOGI(
@@ -412,37 +600,55 @@ static void lcd_test(void)
     );
 }
 
+
 /* =========================================================
- * APP MAIN
+ * MAIN
  * ========================================================= */
 
 void app_main(void)
 {
     ESP_LOGI(
         TAG,
-        "Starting standalone LCD test"
+        "================================"
+    );
+
+    ESP_LOGI(
+        TAG,
+        "ESP32 LCD1602A TEST"
+    );
+
+    ESP_LOGI(
+        TAG,
+        "4-BIT PARALLEL INTERFACE"
+    );
+
+    ESP_LOGI(
+        TAG,
+        "================================"
     );
 
     /*
-     * Initialize I2C FIRST.
+     * Initialize GPIO.
      */
-    ESP_ERROR_CHECK(
-        i2c_master_init()
-    );
+
+    lcd_gpio_init();
 
     /*
      * Initialize LCD.
      */
+
     lcd_init();
 
     /*
-     * Run LCD test.
+     * Run test.
      */
+
     lcd_test();
 
     /*
-     * Keep program alive.
+     * Keep program running.
      */
+
     while (1)
     {
         vTaskDelay(
