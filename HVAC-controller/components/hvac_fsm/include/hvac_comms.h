@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "hvac_states.h"
 #include "hvac_fsm.h"
+#include "hvac_hardware.h"
 
 #define RX_PIN GPIO_NUM_16 // Define the GPIO pin for UART RX
 #define TX_PIN GPIO_NUM_17 // Define the GPIO pin for UART TX
@@ -16,7 +17,8 @@ extern typedef struct {
 extern typedef struct {
     extern hvac_state_t current_state;
     extern hvac_flt_t current_fault;
-    extern fan_state;
+    extern int fan_state;
+    extern int heater_state;
     uint32_t timestamp_us;
     uint8_t checksum;
 } TX_data;
