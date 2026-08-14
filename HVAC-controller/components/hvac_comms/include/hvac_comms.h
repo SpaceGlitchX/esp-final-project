@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #include "driver/gpio.h"
-
+#include "hvac_state_machine.h"
 #include "hvac_states.h"
 
 
@@ -19,6 +19,8 @@
 #define UART_RX_BUFFER_SIZE 256
 #define UART_TX_BUFFER_SIZE 256
 
+extern QueueHandle_t hvac_tx_queue;
+extern TimerHandle_t transmit_timer;
 
 typedef struct
 {
@@ -43,7 +45,7 @@ typedef struct
 } hvac_status_packet_t;
 
 
-extern void uart_setup(void);
+extern void uart_init(void);
 
 
 bool unpack_thermostat_packet(
@@ -71,9 +73,12 @@ int uart_receive(
 );
 
 
-void hvac_uart_receive_task(
+void uart_receive_task(
+    void *pvParameters
+);
+void uart_transmit_task(
     void *pvParameters
 );
 
-
+void transmit_timer_callback(TimerHandle_t xTimer);
 #endif // HVAC_COMMS_H

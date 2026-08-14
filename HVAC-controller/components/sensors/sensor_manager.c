@@ -14,7 +14,7 @@ extern TachSensor tach_sensor;
 extern pcnt_unit_handle_t pcnt_unit;
 
 /**
- * @brief Callback function for analog flame sample timer
+ * Callback function for analog flame sample timer
  */
 
  static void install_event(hvac_cmd_t cmd) {
@@ -35,7 +35,7 @@ static void analog_flame_check_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Callback function for tachometer sample timer
+ * Callback function for tachometer sample timer
  */
 static void tach_monitor_callback(TimerHandle_t xTimer) {
     (void)xTimer;
@@ -48,7 +48,7 @@ static void tach_monitor_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Initialize sensor hardware and FreeRTOS monitoring timers
+ * Initialize sensor hardware and FreeRTOS monitoring timers
  */
 extern void sensor_manager_init(void) {
     if (flame_sensor.init != NULL) {
@@ -83,7 +83,7 @@ extern void sensor_manager_init(void) {
 }
 
 /**
- * @brief Start the flame proving monitor
+ * Start the flame proving monitor
  */
 void start_flame_proving_monitor(void) {
     if (analog_sample_timer != NULL) {
@@ -93,7 +93,7 @@ void start_flame_proving_monitor(void) {
 }
 
 /**
- * @brief Stop the flame proving monitor
+ * Stop the flame proving monitor
  */
 void stop_flame_proving_monitor(void) {
     if (analog_sample_timer != NULL) {
@@ -103,7 +103,7 @@ void stop_flame_proving_monitor(void) {
 }
 
 /**
- * @brief Start tachometer monitoring and hardware pulse counter
+ * Start tachometer monitoring and hardware pulse counter
  */
 void start_tach_monitoring(void) {
     if (pcnt_unit != NULL) {
@@ -116,7 +116,7 @@ void start_tach_monitoring(void) {
 }
 
 /**
- * @brief Stop tachometer monitoring and hardware pulse counter
+ * Stop tachometer monitoring and hardware pulse counter
  */
 void stop_tach_monitoring(void) {
     if (pcnt_unit != NULL) {

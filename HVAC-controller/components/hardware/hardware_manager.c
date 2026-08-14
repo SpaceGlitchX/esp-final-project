@@ -12,7 +12,7 @@ TimerHandle_t fan_warmup_timer   = NULL;
 TimerHandle_t tach_window_timer  = NULL;
 
 /**
- * @brief Post event to FSM queue from FreeRTOS Timer Daemon context.
+ * Post event to FSM queue from FreeRTOS Timer Daemon context.
  */
 static void install_event(hvac_cmd_t cmd) {
     if (hvac_queue != NULL) {
@@ -23,7 +23,7 @@ static void install_event(hvac_cmd_t cmd) {
 }
 
 /**
- * @brief Callback function for flame proving timeout
+ * Callback function for flame proving timeout
  */
 static void flame_proving_timeout_callback(TimerHandle_t xTimer) {
     (void)xTimer;
@@ -32,7 +32,7 @@ static void flame_proving_timeout_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Callback function for fan warmup completion
+ * Callback function for fan warmup completion
  */
 static void warmup_done_callback(TimerHandle_t xTimer) {
     (void)xTimer;
@@ -41,7 +41,7 @@ static void warmup_done_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Callback function for tachometer timeout
+ * Callback function for tachometer timeout
  */
 static void tach_timeout_callback(TimerHandle_t xTimer) {
     (void)xTimer;
@@ -50,9 +50,9 @@ static void tach_timeout_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Initialize the HVAC hardware, GPIO pins, and FreeRTOS safety timers
+ * Initialize the HVAC hardware, GPIO pins, and FreeRTOS safety timers
  */
-extern void init_hvac_hardware(void) {
+extern void hvac_hardware_init(void) {
 
     gpio_set_level(HEATER_PIN, 0);
     gpio_set_level(FAN_PIN, 0);
@@ -80,7 +80,7 @@ extern void init_hvac_hardware(void) {
 }
 
 /**
- * @brief Getter and Setter functions
+ * Getter and Setter functions
  */
 void set_heater_state(int level) {
     gpio_set_level(HEATER_PIN, level);

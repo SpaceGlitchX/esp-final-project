@@ -1,7 +1,8 @@
 idf_component_register(
     SRCS 
         
-        "hvac_test_commands.c"
+        "main.c"
+        "test_harness.c"
         
     INCLUDE_DIRS 
         "."

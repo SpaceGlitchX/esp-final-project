@@ -4,20 +4,16 @@
 #include "hvac_comms.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "test_harness.c"
 
 
 void app_main(void)
 {
     hvac_state_machine_init();
-    xTaskCreate(
-        hvac_state_machine_task,
-        "hvac_fsm",
-        4096,
-        NULL,
-        5,
-        NULL
-    );
-    init_hvac_hardware();
     sensor_manager_init();
-    uart_setup();
+    uart_init();
+    hvac_hardware_init();
+
+    xTaskCreate(test_harness_task, "test", 2048, NULL, 4, NULL);
+    
 }
