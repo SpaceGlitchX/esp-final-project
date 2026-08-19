@@ -10,7 +10,7 @@
 #define UART_TRANSMIT_PERIOD_MS 10000 
 
 //Command sent to the HVAC
-uint8_t thermostat_command = HVAC_CMD_OFF;
+cmd_t thermostat_command = CMD_OFF;
 
 //Most recent operating state
 uint8_t current_hvac_state = HVAC_STATE_IDLE;

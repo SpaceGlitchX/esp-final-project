@@ -21,9 +21,13 @@
 #define UART_BUFFER_SIZE 256 // Size of the UART received buffer in bytes
 
 //Commands sent from the thermostat to the HVAC controller
-#define HVAC_CMD_OFF 0
-#define HVAC_CMD_FAN_ONLY 1
-#define HVAC_CMD_HEAT 2
+typedef enum {
+    CMD_OFF = 0
+    CMD_FAN_ON
+    CMD_FAN_AUTO
+    CMD_HEAT
+} cmd_t;
+
 
 //Possible HVAC states 
 #define HVAC_STATE_IDLE 0
