@@ -6,7 +6,6 @@
 #include "freertos/timers.h"
 #include "esp_err.h"
 #include "hvac_states.h"
-#include "data_logger.h"
 
 // Command queue for sending events/commands to the state machine task
 extern QueueHandle_t hvac_queue;
@@ -19,16 +18,16 @@ extern hvac_cmd_t g_current_hvac_cmd;
 /**
  * Hardware Emergency Interrupt Handler
  */
-void fault_isr_handler(void *arg);
+void fault_isr_handler(void* arg);
 
 /**
  * Initializes state variables, queues, and timer resources.
  */
-extern esp_err_t hvac_state_machine_init(void);
+esp_err_t hvac_state_machine_init(void);
 
 /**
  * Main HVAC Finite State Machine Task
  */
-void hvac_state_machine_task(void *pvParameters);
+void hvac_state_machine_task(void* pvParameters);
 
 #endif // HVAC_STATE_MACHINE_H

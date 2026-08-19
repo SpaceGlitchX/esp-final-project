@@ -1,242 +1,331 @@
 #include "hvac_state_machine.h"
-#include "sensor_manager.h"
+
 #include "hardware_manager.h"
 #include "hvac_states.h"
+#include "sensor_manager.h"
+
 #include "esp_log.h"
 
 static const char *TAG = "HVAC_FSM";
 
-// Queue Handle
+//~ QUEUE
 QueueHandle_t hvac_queue = NULL;
 
-// Global System Monitoring Variables
-hvac_state_t g_current_hvac_state = STATE_FAN_CIRCULATE;
-hvac_flt_t g_current_hvac_fault   = FLT_NONE;
-hvac_cmd_t g_current_hvac_cmd = STATE_IDLE;
+//~ SYSTEM STATE
+hvac_state_t g_current_hvac_state = STATE_IDLE;
+hvac_flt_t g_current_hvac_fault = FLT_NONE;
+hvac_cmd_t g_current_hvac_cmd = CMD_OFF;
 
-// Timer & Pacing Delay Handles
+//~ FAN MODE
+static bool fan_auto = true;
+
+//~ TIMER
 static TimerHandle_t state_pacing_timer = NULL;
-static hvac_state_t  g_next_pending_state = STATE_FAN_CIRCULATE;
+static hvac_state_t g_next_pending_state = STATE_IDLE;
 
-static void update_state(hvac_state_t state) {
-    ESP_LOGI(TAG, "State Transition: %d -> %d", g_current_hvac_state, state);
-    g_current_hvac_state = state;
+//~ STATE UPDATE
+static void update_state(hvac_state_t state)
+{
+  ESP_LOGI(TAG, "State Transition: %d -> %d", g_current_hvac_state, state);
+
+  g_current_hvac_state = state;
+
+  data_logger_log_event(LOG_EVENT_STATE_CHANGE);
 }
 
-static void update_fault(hvac_flt_t fault) {
-    if (fault != FLT_NONE) {
-        ESP_LOGE(TAG, "HVAC Fault Occurred: Fault Code %d", fault);
-    }
-    g_current_hvac_fault = fault;
+//~ FAULT UPDATE
+static void update_fault(hvac_flt_t fault)
+{
+  if (fault != FLT_NONE)
+  {
+    ESP_LOGE(TAG, "HVAC Fault Occurred: Fault Code %d", fault);
+  }
+
+  g_current_hvac_fault = fault;
+
+  data_logger_log_event(LOG_EVENT_FAULT);
 }
 
-/**
- * Safe emergency shutdown of all relays and sampling timers.
- */
-static void safe_shutdown_actuators(void) {
-    set_heater_state(0);
-    set_fan_state(0);
-    
-    stop_flame_proving_monitor();
-    stop_tach_monitoring();
+//~ SAFE SHUTDOWN
+static void safe_shutdown_actuators(void)
+{
+  set_heater_state(0);
+  set_fan_state(0);
 
-    if (state_pacing_timer  != NULL) xTimerStop(state_pacing_timer,  portMAX_DELAY);
-    if (flame_proving_timer != NULL) xTimerStop(flame_proving_timer, portMAX_DELAY);
-    if (fan_warmup_timer   != NULL) xTimerStop(fan_warmup_timer,   portMAX_DELAY);
-    if (tach_window_timer  != NULL) xTimerStop(tach_window_timer,  portMAX_DELAY);
+  stop_flame_proving_monitor();
+  stop_tach_monitoring();
+
+  if (state_pacing_timer != NULL)
+  {
+    xTimerStop(state_pacing_timer, portMAX_DELAY);
+  }
+
+  if (flame_proving_timer != NULL)
+  {
+    xTimerStop(flame_proving_timer, portMAX_DELAY);
+  }
+
+  if (fan_warmup_timer != NULL)
+  {
+    xTimerStop(fan_warmup_timer, portMAX_DELAY);
+  }
+
+  if (tach_window_timer != NULL)
+  {
+    xTimerStop(tach_window_timer, portMAX_DELAY);
+  }
 }
 
-/**
- * Timer callback when inter-state delay expires.
- */
-static void state_delay_callback(TimerHandle_t xTimer) {
-    (void)xTimer;
-    hvac_cmd_t cmd = CMD_STATE_DELAY_COMPLETE;
-    xQueueSend(hvac_queue, &cmd, 0);
+//~ STATE DELAY CALLBACK
+static void state_delay_callback(TimerHandle_t xTimer)
+{
+  (void)xTimer;
+
+  hvac_cmd_t cmd = CMD_STATE_DELAY_COMPLETE;
+
+  xQueueSend(hvac_queue, &cmd, 0);
 }
 
-/**
- * Initiates a non-blocking delay before moving to the next state.
- */
-static void transition_with_delay(hvac_state_t target_state, uint32_t delay_ms) {
-    g_next_pending_state = target_state;
-    update_state(STATE_WAIT_DELAY);
+// TRANSITION DELAY
+static void transition_with_delay(hvac_state_t target_state,
+                                  uint32_t delay_ms)
+{
+  g_next_pending_state = target_state;
 
-    xTimerChangePeriod(state_pacing_timer, pdMS_TO_TICKS(delay_ms), portMAX_DELAY);
-    xTimerStart(state_pacing_timer, portMAX_DELAY);
+  update_state(STATE_WAIT_DELAY);
+
+  xTimerChangePeriod(state_pacing_timer, pdMS_TO_TICKS(delay_ms),
+                     portMAX_DELAY);
+
+  xTimerStart(state_pacing_timer, portMAX_DELAY);
 }
 
-/**
- * Hardware Emergency Interrupt Handler
- */
-void IRAM_ATTR fault_isr_handler(void *arg) {
-    (void)arg;
-    hvac_cmd_t cmd = CMD_OFF;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE; 
-    
-    xQueueSendFromISR(hvac_queue, &cmd, &xHigherPriorityTaskWoken);
+// FAULT ISR
+void IRAM_ATTR fault_isr_handler(void *arg)
+{
+  (void)arg;
+  hvac_cmd_t cmd = CMD_OFF;
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  xQueueSendFromISR(hvac_queue, &cmd, &xHigherPriorityTaskWoken);
 
-    if (xHigherPriorityTaskWoken == pdTRUE) {
-        portYIELD_FROM_ISR();
-    }
+  if (xHigherPriorityTaskWoken == pdTRUE)
+  {
+    portYIELD_FROM_ISR();
+  }
 }
 
-/**
- * Initializes queues, software timers, and initial states.
- */
-esp_err_t hvac_state_machine_init(void) {
-    ESP_LOGI(TAG, "Initializing HVAC State Machine...");
+// INITIALIZATION
+esp_err_t hvac_state_machine_init(void)
+{
+  ESP_LOGI(TAG, "Initializing HVAC State Machine...");
 
-    if (hvac_queue == NULL) {
-        hvac_queue = xQueueCreate(10, sizeof(hvac_cmd_t));
-        if (hvac_queue == NULL) {
-            ESP_LOGE(TAG, "Failed to create HVAC command queue!");
-            return ESP_FAIL;
+  hvac_queue = xQueueCreate(10, sizeof(hvac_cmd_t));
+
+  if (hvac_queue == NULL)
+  {
+    ESP_LOGE(TAG, "Failed to create HVAC command queue!");
+
+    return ESP_FAIL;
+  }
+  state_pacing_timer = xTimerCreate("StatePacingTimer", pdMS_TO_TICKS(4000),
+                                    pdFALSE, NULL, state_delay_callback);
+
+  if (state_pacing_timer == NULL)
+  {
+    ESP_LOGE(TAG, "Failed to create state pacing timer!");
+
+    return ESP_FAIL;
+  }
+  g_current_hvac_state = STATE_IDLE;
+  g_current_hvac_fault = FLT_NONE;
+  g_current_hvac_cmd = CMD_OFF;
+  fan_auto = true;
+  safe_shutdown_actuators();
+  BaseType_t task_result = xTaskCreate(
+      hvac_state_machine_task, "hvac_state_machine", 4096, NULL, 5, NULL);
+
+  if (task_result != pdPASS)
+  {
+    ESP_LOGE(TAG, "Failed to create HVAC state machine task!");
+
+    return ESP_FAIL;
+  }
+  return ESP_OK;
+}
+
+//~ MAIN FSM TASK
+void hvac_state_machine_task(void *pvParameters)
+{
+  (void)pvParameters;
+  hvac_cmd_t event;
+  ESP_LOGI(TAG, "HVAC State Machine Task Started.");
+
+  while (1)
+  {
+    if (xQueueReceive(hvac_queue, &event, portMAX_DELAY) == pdTRUE)
+    {
+
+      g_current_hvac_cmd = event;
+      data_logger_log_event(LOG_EVENT_COMMAND);
+
+      // GLOBAL OFF COMMAND
+      if (event == CMD_OFF)
+      {
+        safe_shutdown_actuators();
+        update_fault(FLT_NONE);
+        update_state(STATE_IDLE);
+        fan_auto = true;
+        ESP_LOGI(TAG, "System returned to IDLE");
+        continue;
+      }
+
+      // FAN ON COMMAND
+      if (event == CMD_FAN_ON)
+      {
+        fan_auto = false;
+        set_fan_state(1);
+        if (g_current_hvac_state == STATE_IDLE)
+        {
+          update_state(STATE_FAN_CIRCULATE);
         }
-    }
 
-    if (state_pacing_timer == NULL) {
-        state_pacing_timer = xTimerCreate("StatePacingTimer", pdMS_TO_TICKS(4000), pdFALSE, NULL, state_delay_callback);
-        if (state_pacing_timer == NULL) {
-            ESP_LOGE(TAG, "Failed to create inter-state delay timer!");
-            return ESP_FAIL;
+        continue;
+      }
+
+      // FAN AUTO COMMAND
+      if (event == CMD_FAN_AUTO)
+      {
+        fan_auto = true;
+        /*
+         * If we are not heating, turn the fan off.
+         */
+        if (g_current_hvac_state == STATE_FAN_CIRCULATE ||
+            g_current_hvac_state == STATE_IDLE)
+        {
+          set_fan_state(0);
+          update_state(STATE_IDLE);
         }
-    }
+        continue;
+      }
 
-    g_current_hvac_state = STATE_IDLE;
-    g_current_hvac_fault = FLT_NONE;
-    safe_shutdown_actuators();
+      // INTER-STATE DELAY
+      if (g_current_hvac_state == STATE_WAIT_DELAY)
+      {
+        if (event == CMD_STATE_DELAY_COMPLETE)
+        {
+          hvac_state_t next = g_next_pending_state;
+          update_state(next);
 
-    BaseType_t task_result = xTaskCreate(
-    hvac_state_machine_task,
-    "hvac_state_machine",
-    2048,
-    NULL,
-    5,
-    NULL
-    );
+          if (next == STATE_IGNITION)
+          {
+            set_heater_state(1);
+            xTimerStart(flame_proving_timer, portMAX_DELAY);
 
-    if (task_result != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create HVAC state machine task!");
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-    }
-
-/**
- * Main HVAC Finite State Machine Task
- */
-void hvac_state_machine_task(void *pvParameters) {
-    (void)pvParameters;
-    hvac_cmd_t event;
-
-    ESP_LOGI(TAG, "HVAC State Machine Task Started.");
-
-    while (1) {
-        if (xQueueReceive(hvac_queue, &event, portMAX_DELAY) == pdTRUE) {
-            
-            g_current_hvac_cmd = event;
-            
-            // GLOBAL EMERGENCY / OFF COMMAND
-            if (event == CMD_OFF) {
-                safe_shutdown_actuators();
-                update_fault(FLT_NONE);
-                update_state(STATE_IDLE);
-                ESP_LOGI(TAG, "System returned to IDLE via CMD_OFF.");
-                continue;
-            }
-
-            // INTER-STATE DELAY HANDLING
-            if (g_current_hvac_state == STATE_WAIT_DELAY) {
-                if (event == CMD_STATE_DELAY_COMPLETE) {
-                    hvac_state_t next = g_next_pending_state;
-                    update_state(next);
-                    
-                    // Trigger entry actions for target states
-                    if (next == STATE_IGNITION) {
-                        set_heater_state(1);
-                        xTimerStart(flame_proving_timer, portMAX_DELAY);
-                        start_flame_proving_monitor();
-                    } else if (next == STATE_WARMUP) {
-                        xTimerStart(fan_warmup_timer, portMAX_DELAY);
-                    } else if (next == STATE_VERIFY_RPM) {
-                        set_fan_state(1);
-                        start_tach_monitoring();
-                        xTimerStart(tach_window_timer, portMAX_DELAY);
-                    }
-                }
-                continue; 
-            }
-
-            // NORMAL EVENT SWITCH
-            switch (g_current_hvac_state) {
-
-                case STATE_IDLE:
-                    if (event == CMD_HEAT) {
-                        set_fan_state(0);
-                        transition_with_delay(STATE_IGNITION, 1000);
-                    } else if (event == CMD_FAN_ONLY) {
-                        set_fan_state(1);
-                        transition_with_delay(STATE_FAN_CIRCULATE, 500);
-                    }
-                    break;
-
-                case STATE_FAN_CIRCULATE:
-                    if (event == CMD_HEAT) {
-                        transition_with_delay(STATE_IGNITION, 1000);
-                    }
-                    break;
-
-                case STATE_IGNITION:
-                    if (event == CMD_FLAME_DETECTED) {
-                        stop_flame_proving_monitor();
-                        xTimerStop(flame_proving_timer, portMAX_DELAY);
-                        transition_with_delay(STATE_WARMUP, 1000);
-
-                    } else if (event == CMD_FLAME_TIMEOUT) {
-                        safe_shutdown_actuators();
-                        update_fault(FLT_FLAME);
-                        update_state(STATE_FAULT);
-                    }
-                    break;
-
-                case STATE_WARMUP:
-                    if (event == CMD_WARMUP_DONE) {
-                        xTimerStop(fan_warmup_timer, portMAX_DELAY);
-                        transition_with_delay(STATE_VERIFY_RPM, 500);
-                    }
-                    break;
-
-                case STATE_VERIFY_RPM:
-                    if (event == CMD_FAN_OK) {
-                        xTimerStop(tach_window_timer, portMAX_DELAY);
-                        stop_tach_monitoring();
-                        transition_with_delay(STATE_RUNNING, 1000);
-
-                    } else if (event == CMD_TACH_TIMEOUT) {
-                        safe_shutdown_actuators();
-                        update_fault(FLT_FAN);
-                        
-                        update_state(STATE_FAULT);
-                    }
-                    break;
-
-                case STATE_RUNNING:
-                    // Maintain heat & fan status
-                    break;
-
-                case STATE_FAULT:
-                    // System locked out until CMD_OFF is sent
-                    set_heater_state(0);
-                    set_fan_state(0);
-                    break;
-
-                default:
-                    safe_shutdown_actuators();
-                    update_state(STATE_IDLE);
-                    break;
-            }
+            start_flame_proving_monitor();
+          }
+          else if (next == STATE_WARMUP)
+          {
+            xTimerStart(fan_warmup_timer, portMAX_DELAY);
+          }
+          else if (next == STATE_VERIFY_RPM)
+          {
+            set_fan_state(1);
+            start_tach_monitoring();
+            xTimerStart(tach_window_timer, portMAX_DELAY);
+          }
         }
+        continue;
+      }
+
+      // NORMAL STATE MACHINE
+      switch (g_current_hvac_state)
+      {
+      case STATE_IDLE:
+        if (event == CMD_HEAT)
+        {
+          set_fan_state(0);
+          transition_with_delay(STATE_IGNITION, 1000);
+        }
+
+        break;
+
+      case STATE_FAN_CIRCULATE:
+        if (event == CMD_HEAT)
+        {
+          transition_with_delay(STATE_IGNITION, 1000);
+        }
+
+        break;
+
+      case STATE_IGNITION:
+        if (event == CMD_FLAME_DETECTED)
+        {
+          stop_flame_proving_monitor();
+          xTimerStop(flame_proving_timer, portMAX_DELAY);
+          transition_with_delay(STATE_WARMUP, 1000);
+        }
+        else if (event == CMD_FLAME_TIMEOUT)
+        {
+          safe_shutdown_actuators();
+          update_fault(FLT_FLAME);
+          update_state(STATE_FAULT);
+        }
+
+        break;
+
+      case STATE_WARMUP:
+        if (event == CMD_WARMUP_DONE)
+        {
+          xTimerStop(fan_warmup_timer, portMAX_DELAY);
+          transition_with_delay(STATE_VERIFY_RPM, 500);
+        }
+
+        break;
+
+      case STATE_VERIFY_RPM:
+        if (event == CMD_FAN_OK)
+        {
+          xTimerStop(tach_window_timer, portMAX_DELAY);
+
+          stop_tach_monitoring();
+          transition_with_delay(STATE_RUNNING, 1000);
+        }
+        else if (event == CMD_TACH_TIMEOUT)
+        {
+          safe_shutdown_actuators();
+          update_fault(FLT_FAN);
+          update_state(STATE_FAULT);
+        }
+
+        break;
+
+      case STATE_RUNNING:
+        /*
+         * Heating is running.
+         *
+         * In FAN AUTO mode the fan remains on
+         * while heating.
+         *
+         * In FAN ON mode the fan also remains on.
+         */
+        set_heater_state(1);
+        set_fan_state(1);
+        break;
+
+      case STATE_FAULT:
+        /*
+         * System remains locked out until
+         * CMD_OFF is received.
+         */
+        set_heater_state(0);
+        set_fan_state(0);
+        break;
+
+      default:
+        safe_shutdown_actuators();
+        update_state(STATE_IDLE);
+        break;
+      }
     }
+  }
 }

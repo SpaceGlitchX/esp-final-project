@@ -16,8 +16,11 @@ typedef enum {
 // State machine events
 typedef enum {
     CMD_OFF = 0,
-    CMD_FAN_ONLY,
+    CMD_ON,
+    CMD_FAN_ON,
+    CMD_FAN_AUTO,
     CMD_HEAT,
+
     CMD_FLAME_DETECTED,
     CMD_FLAME_TIMEOUT,
     CMD_FAN_OK,

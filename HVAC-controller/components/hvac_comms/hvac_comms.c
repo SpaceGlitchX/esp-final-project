@@ -1,6 +1,6 @@
 #include "hvac_comms.h"
-#include "hvac_state_machine.h"
 #include "hardware_manager.h"
+#include "hvac_state_machine.h"
 
 #include <string.h>
 
@@ -9,13 +9,11 @@
 #include "esp_timer.h"
 
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 #include "freertos/timers.h"
 
-
 static const char *TAG = "HVAC_COMMS";
-
 
 /* ============================================================
  * QUEUES AND TIMER
@@ -30,241 +28,126 @@ static const char *TAG = "HVAC_COMMS";
  */
 
 QueueHandle_t transmit_queue = NULL;
-
 TimerHandle_t transmit_timer = NULL;
-
 
 /* ============================================================
  * CHECKSUM
  * ============================================================ */
 
-static uint8_t calculate_checksum(
-    const uint8_t *buffer,
-    size_t length)
-{
-    uint8_t checksum = 0;
+static uint8_t calculate_checksum(const uint8_t *buffer, size_t length) {
+	uint8_t checksum = 0;
 
-    for (size_t i = 0; i < length; i++)
-    {
-        checksum ^= buffer[i];
-    }
+	for (size_t i = 0; i < length; i++) {
+		checksum ^= buffer[i];
+	}
 
-    return checksum;
+	return checksum;
 }
-
 
 /* ============================================================
  * TRANSMIT TIMER CALLBACK
  * ============================================================ */
 
-void transmit_timer_callback(TimerHandle_t timer)
-{
-    (void)timer;
+void transmit_timer_callback(TimerHandle_t timer) {
+	uint8_t event = 1;
 
-    uint8_t event = 1;
+	if (transmit_queue != NULL) {
+		BaseType_t result = xQueueSend(transmit_queue, &event, 0);
 
-    if (transmit_queue != NULL)
-    {
-        BaseType_t result =
-            xQueueSend(
-                transmit_queue,
-                &event,
-                0
-            );
-
-        if (result != pdTRUE)
-        {
-            ESP_LOGW(
-                TAG,
-                "Transmit queue full"
-            );
-        }
-    }
+		if (result != pdTRUE) {
+			ESP_LOGW(TAG, "Transmit queue full");
+		}
+	}
 }
-
 
 /* ============================================================
  * UART INITIALIZATION
  * ============================================================ */
 
-void uart_init(void)
-{
-    uart_config_t uart_config =
-    {
-        .baud_rate = UART_BAUD_RATE,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
+void uart_init(void) {
+	uart_config_t uart_config = {
+		.baud_rate = UART_BAUD_RATE,
+		.data_bits = UART_DATA_8_BITS,
+		.parity = UART_PARITY_DISABLE,
+		.stop_bits = UART_STOP_BITS_1,
+		.flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+		.source_clk = UART_SCLK_DEFAULT,
+	};
 
+	/* --------------------------------------------------------
+	 * Install UART driver
+	 * -------------------------------------------------------- */
 
-    /* --------------------------------------------------------
-     * Install UART driver
-     * -------------------------------------------------------- */
+	ESP_ERROR_CHECK(uart_driver_install(UART_PORT, UART_RX_BUFFER_SIZE,
+	                                    UART_TX_BUFFER_SIZE, 0, NULL, 0));
 
-    ESP_ERROR_CHECK(
-        uart_driver_install(
-            UART_PORT,
-            UART_RX_BUFFER_SIZE,
-            UART_TX_BUFFER_SIZE,
-            0,
-            NULL,
-            0
-        )
-    );
+	/* --------------------------------------------------------
+	 * Configure UART
+	 * -------------------------------------------------------- */
 
+	ESP_ERROR_CHECK(uart_param_config(UART_PORT, &uart_config));
 
-    /* --------------------------------------------------------
-     * Configure UART
-     * -------------------------------------------------------- */
+	/* --------------------------------------------------------
+	 * Configure UART pins
+	 * -------------------------------------------------------- */
 
-    ESP_ERROR_CHECK(
-        uart_param_config(
-            UART_PORT,
-            &uart_config
-        )
-    );
+	ESP_ERROR_CHECK(uart_set_pin(UART_PORT, TX_PIN, RX_PIN,
+	                            UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
+	ESP_LOGI(TAG, "UART initialized: port=%d RX=%d TX=%d baud=%d",
+	        UART_PORT, RX_PIN, TX_PIN, UART_BAUD_RATE);
 
-    /* --------------------------------------------------------
-     * Configure UART pins
-     * -------------------------------------------------------- */
+	/* --------------------------------------------------------
+	 * Create transmit queue
+	 * -------------------------------------------------------- */
 
-    ESP_ERROR_CHECK(
-        uart_set_pin(
-            UART_PORT,
-            TX_PIN,
-            RX_PIN,
-            UART_PIN_NO_CHANGE,
-            UART_PIN_NO_CHANGE
-        )
-    );
+	transmit_queue = xQueueCreate(5, sizeof(uint8_t));
 
+	if (transmit_queue == NULL) {
+		ESP_LOGE(TAG, "Failed to create transmit queue");
+		return;
+	}
 
-    ESP_LOGI(
-        TAG,
-        "UART initialized: port=%d RX=%d TX=%d baud=%d",
-        UART_PORT,
-        RX_PIN,
-        TX_PIN,
-        UART_BAUD_RATE
-    );
+	/* --------------------------------------------------------
+	 * Start RX task
+	 * -------------------------------------------------------- */
 
+	BaseType_t result;
 
-    /* --------------------------------------------------------
-     * Create transmit queue
-     * -------------------------------------------------------- */
+	result = xTaskCreate(uart_receive_task, "uart_receive", 3072, NULL, 5, NULL);
 
-    transmit_queue =
-        xQueueCreate(
-            5,
-            sizeof(uint8_t)
-        );
+	if (result != pdPASS) {
+		ESP_LOGE(TAG, "Failed to create UART receive task");
+	}
 
-    if (transmit_queue == NULL)
-    {
-        ESP_LOGE(
-            TAG,
-            "Failed to create transmit queue"
-        );
+	/* --------------------------------------------------------
+	 * Start TX task
+	 * -------------------------------------------------------- */
 
-        return;
-    }
+	result = xTaskCreate(uart_transmit_task, "uart_transmit", 3072, NULL, 4, NULL);
 
+	if (result != pdPASS) {
+		ESP_LOGE(TAG, "Failed to create UART transmit task");
+	}
 
-    /* --------------------------------------------------------
-     * Start RX task
-     * -------------------------------------------------------- */
+	transmit_timer = xTimerCreate("transmit_timer", pdMS_TO_TICKS(500),
+	                            pdTRUE, NULL, transmit_timer_callback);
 
-    BaseType_t result;
+	if (transmit_timer == NULL) {
+		ESP_LOGE(TAG, "Failed to create transmit timer");
+		return;
+	}
 
-    result =
-        xTaskCreate(
-            uart_receive_task,
-            "uart_receive",
-            3072,
-            NULL,
-            5,
-            NULL
-        );
+	/* --------------------------------------------------------
+	 * Start transmit timer
+	 * -------------------------------------------------------- */
 
-    if (result != pdPASS)
-    {
-        ESP_LOGE(
-            TAG,
-            "Failed to create UART receive task"
-        );
-    }
+	if (xTimerStart(transmit_timer, pdMS_TO_TICKS(1000)) != pdPASS) {
+		ESP_LOGE(TAG, "Failed to start transmit timer");
+	}
 
-
-    /* --------------------------------------------------------
-     * Start TX task
-     * -------------------------------------------------------- */
-
-    result =
-        xTaskCreate(
-            uart_transmit_task,
-            "uart_transmit",
-            3072,
-            NULL,
-            4,
-            NULL
-        );
-
-    if (result != pdPASS)
-    {
-        ESP_LOGE(
-            TAG,
-            "Failed to create UART transmit task"
-        );
-    }
-
-    transmit_timer =
-        xTimerCreate(
-            "transmit_timer",
-            pdMS_TO_TICKS(500),
-            pdTRUE,
-            NULL,
-            transmit_timer_callback
-        );
-
-    if (transmit_timer == NULL)
-    {
-        ESP_LOGE(
-            TAG,
-            "Failed to create transmit timer"
-        );
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-     * Start transmit timer
-     * -------------------------------------------------------- */
-
-    if (
-        xTimerStart(
-            transmit_timer,
-            pdMS_TO_TICKS(1000)
-        ) != pdPASS
-    )
-    {
-        ESP_LOGE(
-            TAG,
-            "Failed to start transmit timer"
-        );
-    }
-
-
-    ESP_LOGI(
-        TAG,
-        "UART communication system started"
-    );
+	ESP_LOGI(TAG, "UART communication system started");
 }
-
 
 /* ============================================================
  * THERMOSTAT PACKET RX
@@ -280,83 +163,37 @@ void uart_init(void)
  * TOTAL = 6 bytes
  */
 
-bool unpack_thermostat_packet(
-    thermostat_packet_t *data,
-    const uint8_t *buffer)
-{
-    if (
-        data == NULL ||
-        buffer == NULL
-    )
-    {
-        ESP_LOGE(
-            TAG,
-            "NULL pointer passed to unpack_thermostat_packet"
-        );
+bool unpack_thermostat_packet(thermostat_packet_t *data,
+                              const uint8_t *buffer) {
+	if (data == NULL || buffer == NULL) {
+		ESP_LOGE(TAG, "NULL pointer passed to unpack_thermostat_packet");
+		return false;
+	}
 
-        return false;
-    }
+	/* HVAC command */
+	data->thermostat_cmd = (hvac_cmd_t)buffer[0];
 
+	/* Timestamp */
+	memcpy(&data->timestamp_us, &buffer[1], sizeof(data->timestamp_us));
 
-    /* HVAC command */
+	/* Received checksum */
+	data->checksum = buffer[5];
 
-    data->thermostat_cmd =
-        (hvac_cmd_t)buffer[0];
+	/* Calculate checksum */
+	uint8_t calculated_checksum = calculate_checksum(buffer, 5);
 
+	/* Validate checksum */
+	if (calculated_checksum != data->checksum) {
+		ESP_LOGE(TAG, "Checksum error: received=0x%02X calculated=0x%02X",
+		        data->checksum, calculated_checksum);
+		return false;
+	}
 
-    /* Timestamp */
+	ESP_LOGD(TAG, "Valid thermostat packet: command=%d timestamp=%lu",
+	        data->thermostat_cmd, (unsigned long)data->timestamp_us);
 
-    memcpy(
-        &data->timestamp_us,
-        &buffer[1],
-        sizeof(data->timestamp_us)
-    );
-
-
-    /* Received checksum */
-
-    data->checksum =
-        buffer[5];
-
-
-    /* Calculate checksum */
-
-    uint8_t calculated_checksum =
-        calculate_checksum(
-            buffer,
-            5
-        );
-
-
-    /* Validate checksum */
-
-    if (
-        calculated_checksum !=
-        data->checksum
-    )
-    {
-        ESP_LOGE(
-            TAG,
-            "Checksum error: received=0x%02X calculated=0x%02X",
-            data->checksum,
-            calculated_checksum
-        );
-
-        return false;
-    }
-
-
-    ESP_LOGD(
-        TAG,
-        "Valid thermostat packet: command=%d timestamp=%lu",
-        data->thermostat_cmd,
-        (unsigned long)data->timestamp_us
-    );
-
-
-    return true;
+	return true;
 }
-
 
 /* ============================================================
  * HVAC STATUS PACKET TX
@@ -375,352 +212,160 @@ bool unpack_thermostat_packet(
  * TOTAL = 9 bytes
  */
 
-void pack_hvac_status_packet(
-    hvac_status_packet_t *data,
-    uint8_t *buffer)
-{
-    if (
-        data == NULL ||
-        buffer == NULL
-    )
-    {
-        ESP_LOGE(
-            TAG,
-            "NULL pointer passed to pack_hvac_status_packet"
-        );
+void pack_hvac_status_packet(hvac_status_packet_t *data, uint8_t *buffer) {
+	if (data == NULL || buffer == NULL) {
+		ESP_LOGE(TAG, "NULL pointer passed to pack_hvac_status_packet");
+		return;
+	}
 
-        return;
-    }
+	/* State */
+	buffer[0] = (uint8_t)data->current_state;
 
+	/* Fault */
+	buffer[1] = (uint8_t)data->current_fault;
 
-    /* State */
+	/* Fan */
+	buffer[2] = (uint8_t)data->fan_state;
 
-    buffer[0] =
-        (uint8_t)data->current_state;
+	/* Heater */
+	buffer[3] = (uint8_t)data->heater_state;
 
+	/* Timestamp */
+	uint32_t timestamp_us = (uint32_t)esp_timer_get_time();
+	memcpy(&buffer[4], &timestamp_us, sizeof(timestamp_us));
+	data->timestamp_us = timestamp_us;
 
-    /* Fault */
-
-    buffer[1] =
-        (uint8_t)data->current_fault;
-
-
-    /* Fan */
-
-    buffer[2] =
-        (uint8_t)data->fan_state;
-
-
-    /* Heater */
-
-    buffer[3] =
-        (uint8_t)data->heater_state;
-
-
-    /* Timestamp */
-
-    uint32_t timestamp_us =
-        (uint32_t)esp_timer_get_time();
-
-
-    memcpy(
-        &buffer[4],
-        &timestamp_us,
-        sizeof(timestamp_us)
-    );
-
-
-    data->timestamp_us =
-        timestamp_us;
-
-
-    /* Checksum */
-
-    buffer[8] =
-        calculate_checksum(
-            buffer,
-            8
-        );
-
-
-    data->checksum =
-        buffer[8];
+	/* Checksum */
+	buffer[8] = calculate_checksum(buffer, 8);
+	data->checksum = buffer[8];
 }
-
 
 /* ============================================================
  * UART SEND
  * ============================================================ */
 
-int uart_send(
-    uint8_t *buffer,
-    size_t length)
-{
-    if (
-        buffer == NULL ||
-        length == 0
-    )
-    {
-        return -1;
-    }
+int uart_send(uint8_t *buffer, size_t length) {
+	if (buffer == NULL || length == 0) {
+		return -1;
+	}
 
+	int bytes_written = uart_write_bytes(UART_PORT, buffer, length);
 
-    int bytes_written =
-        uart_write_bytes(
-            UART_PORT,
-            buffer,
-            length
-        );
+	if (bytes_written < 0) {
+		ESP_LOGE(TAG, "UART transmission failed");
+		return bytes_written;
+	}
 
+	ESP_LOGD(TAG, "UART transmitted %d bytes", bytes_written);
 
-    if (bytes_written < 0)
-    {
-        ESP_LOGE(
-            TAG,
-            "UART transmission failed"
-        );
-
-        return bytes_written;
-    }
-
-
-    ESP_LOGD(
-        TAG,
-        "UART transmitted %d bytes",
-        bytes_written
-    );
-
-
-    return bytes_written;
+	return bytes_written;
 }
-
 
 /* ============================================================
  * UART RECEIVE
  * ============================================================ */
 
-int uart_receive(
-    uint8_t *buffer,
-    size_t length,
-    uint32_t timeout_ms)
-{
-    if (
-        buffer == NULL ||
-        length == 0
-    )
-    {
-        return -1;
-    }
+int uart_receive(uint8_t *buffer, size_t length, uint32_t timeout_ms) {
+	if (buffer == NULL || length == 0) {
+		return -1;
+	}
 
-
-    return uart_read_bytes(
-        UART_PORT,
-        buffer,
-        length,
-        pdMS_TO_TICKS(timeout_ms)
-    );
+	return uart_read_bytes(UART_PORT, buffer, length, pdMS_TO_TICKS(timeout_ms));
 }
-
 
 /* ============================================================
  * UART RECEIVE TASK
  * ============================================================ */
 
-void uart_receive_task(
-    void *pvParameters)
-{
-    (void)pvParameters;
+void uart_receive_task(void *pvParameters) {
+	(void)pvParameters;
 
+	uint8_t buffer[6];
+	thermostat_packet_t packet;
 
-    uint8_t buffer[6];
+	ESP_LOGI(TAG, "HVAC UART receive task started");
 
-    thermostat_packet_t packet;
+	while (1) {
+		int bytes_received = uart_receive(buffer, sizeof(buffer), 100);
 
+		if (bytes_received == sizeof(buffer)) {
+			/*
+			 * Validate packet.
+			 */
 
-    ESP_LOGI(
-        TAG,
-        "HVAC UART receive task started"
-    );
+			if (unpack_thermostat_packet(&packet, buffer)) {
+				ESP_LOGI(TAG, "Thermostat command received: %d",
+				        packet.thermostat_cmd);
 
+				/*
+				 * Send command to FSM.
+				 */
 
-    while (1)
-    {
+				if (hvac_queue != NULL) {
+					BaseType_t result = xQueueSend(
+						hvac_queue,
+						&packet.thermostat_cmd,
+						0
+					);
 
-        int bytes_received =
-            uart_receive(
-                buffer,
-                sizeof(buffer),
-                100
-            );
-
-
-        if (
-            bytes_received ==
-            sizeof(buffer)
-        )
-        {
-            /*
-             * Validate packet.
-             */
-
-            if (
-                unpack_thermostat_packet(
-                    &packet,
-                    buffer
-                )
-            )
-            {
-                ESP_LOGI(
-                    TAG,
-                    "Thermostat command received: %d",
-                    packet.thermostat_cmd
-                );
-
-
-                /*
-                 * Send command to FSM.
-                 */
-
-                if (
-                    hvac_queue !=
-                    NULL
-                )
-                {
-                    BaseType_t result =
-                        xQueueSend(
-                            hvac_queue,
-                            &packet.thermostat_cmd,
-                            0
-                        );
-
-
-                    if (
-                        result !=
-                        pdTRUE
-                    )
-                    {
-                        ESP_LOGW(
-                            TAG,
-                            "HVAC command queue full"
-                        );
-                    }
-                }
-            }
-        }
-
-
-        else if (
-            bytes_received > 0
-        )
-        {
-            ESP_LOGW(
-                TAG,
-                "Incomplete packet: %d/%d bytes",
-                bytes_received,
-                sizeof(buffer)
-            );
-        }
-    }
+					if (result != pdTRUE) {
+						ESP_LOGW(TAG, "HVAC command queue full");
+					}
+				}
+			}
+		} else if (bytes_received > 0) {
+			ESP_LOGW(TAG, "Incomplete packet: %d/%d bytes",
+			        bytes_received, sizeof(buffer));
+		}
+	}
 }
-
 
 /* ============================================================
  * UART TRANSMIT TASK
  * ============================================================ */
 
-void uart_transmit_task(
-    void *pvParameters)
-{
-    (void)pvParameters;
+void uart_transmit_task(void *pvParameters) {
+	(void)pvParameters;
 
+	uint8_t event;
+	uint8_t buffer[9];
+	hvac_status_packet_t packet;
 
-    uint8_t event;
+	ESP_LOGI(TAG, "HVAC UART transmit task started");
 
-    uint8_t buffer[9];
+	while (1) {
+		if (xQueueReceive(transmit_queue, &event, portMAX_DELAY) == pdTRUE) {
+			/*
+			 * Build current HVAC status.
+			 */
 
-    hvac_status_packet_t packet;
+			packet.current_state = g_current_hvac_state;
+			packet.current_fault = g_current_hvac_fault;
 
+			/*
+			 * Get current actuator states.
+			 */
 
-    ESP_LOGI(
-        TAG,
-        "HVAC UART transmit task started"
-    );
+			packet.fan_state = get_fan_state();
+			packet.heater_state = get_heater_state();
 
+			/*
+			 * Pack the status packet.
+			 */
 
-    while (1)
-    {
-        
-        if (
-            xQueueReceive(
-                transmit_queue,
-                &event,
-                portMAX_DELAY
-            ) == pdTRUE
-        )
-        {
-            /*
-             * Build current HVAC status.
-             */
+			pack_hvac_status_packet(&packet, buffer);
 
-            packet.current_state =
-                g_current_hvac_state;
+			/*
+			 * Transmit packet.
+			 */
 
-            packet.current_fault =
-                g_current_hvac_fault;
+			int result = uart_send(buffer, sizeof(buffer));
 
-
-            /*
-             * Get current actuator states.
-             *
-             * Replace these with your actual getter
-             * functions if hardware_manager provides them.
-             */
-
-            packet.fan_state =
-                get_fan_state();
-
-            packet.heater_state =
-                get_heater_state();
-
-
-            /*
-             * Pack the status packet.
-             */
-
-            pack_hvac_status_packet(
-                &packet,
-                buffer
-            );
-
-
-            /*
-             * Transmit packet.
-             */
-
-            int result =
-                uart_send(
-                    buffer,
-                    sizeof(buffer)
-                );
-
-
-            if (
-                result ==
-                sizeof(buffer)
-            )
-            {
-                ESP_LOGD(
-                    TAG,
-                    "HVAC status packet transmitted"
-                );
-            }
-            else
-            {
-                ESP_LOGW(
-                    TAG,
-                    "HVAC status packet transmission incomplete"
-                );
-            }
-        }
-    }
+			if (result == sizeof(buffer)) {
+				ESP_LOGD(TAG, "HVAC status packet transmitted");
+			} else {
+				ESP_LOGW(TAG, "HVAC status packet transmission incomplete");
+			}
+		}
+	}
 }
