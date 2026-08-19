@@ -1,106 +1,330 @@
 #include "thermo_comms.h"
 
+#include <stdio.h>
+#include <string.h>
+
+#include "driver/uart.h"
+
+#include "esp_log.h"
+#include "esp_timer.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 
-//~ This file configures UART comm between thermostat and HVAC
-//~ Sends the termostat command every 10 sec. 
-//~ Receives the current HVAC state and fault value
+static const char *TAG = "THERMO_COMMS";
 
-//Sends a command every 10 seconds
-#define UART_TRANSMIT_PERIOD_MS 10000 
 
-//Command sent to the HVAC
-cmd_t thermostat_command = CMD_OFF;
+#define UART_TRANSMIT_PERIOD_MS 10000
 
-//Most recent operating state
-uint8_t current_hvac_state = HVAC_STATE_IDLE;
+#define THERMOSTAT_PACKET_SIZE 6
 
-//Most recent fault value
-uint8_t current_hvac_fault = HVAC_FAULT_NONE;
+#define HVAC_STATUS_PACKET_SIZE 9
+
+
+/* ============================================================
+ * GLOBAL DATA
+ * ============================================================ */
+
+hvac_cmd_t thermostat_command = CMD_OFF;
+
+uint8_t current_hvac_state = STATE_IDLE;
+
+uint8_t current_hvac_fault = FLT_NONE;
+
+uint8_t current_hvac_fan = 0;
+
+uint8_t current_hvac_heater = 0;
+
+
+/* ============================================================
+ * CHECKSUM
+ * ============================================================ */
+
+static uint8_t calculate_checksum(
+	const uint8_t *buffer,
+	size_t length)
+{
+	uint8_t checksum = 0;
+
+	for (size_t i = 0; i < length; i++) {
+		checksum ^= buffer[i];
+	}
+
+	return checksum;
+}
+
+
+/* ============================================================
+ * UART INITIALIZATION
+ * ============================================================ */
 
 void thermo_comms_init(void)
 {
-    //UART communication settings
-    uart_config_t uart_config = {
-        .baud_rate = UART_BAUD_RATE,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT
-    };
+	uart_config_t uart_config = {
+		.baud_rate = UART_BAUD_RATE,
+		.data_bits = UART_DATA_8_BITS,
+		.parity = UART_PARITY_DISABLE,
+		.stop_bits = UART_STOP_BITS_1,
+		.flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+		.source_clk = UART_SCLK_DEFAULT
+	};
 
-    //Apply the same settings from UART to UART2
-    ESP_ERROR_CHECK(uart_param_config(THERMO_UART, &uart_config));
 
-    //Connect UART2 to the TX and RX pins
-    ESP_ERROR_CHECK(uart_set_pin(THERMO_UART, UART_TX, UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+	ESP_ERROR_CHECK(
+		uart_param_config(
+			THERMO_UART,
+			&uart_config
+		)
+	);
 
-    //Instal the UART driver and create the receive buffer
-    ESP_ERROR_CHECK(uart_driver_install(THERMO_UART, UART_BUFFER_SIZE, 0, 0, NULL, 0));
 
-    printf("Thermostat UART was initialized\n");
+	ESP_ERROR_CHECK(
+		uart_set_pin(
+			THERMO_UART,
+			UART_TX,
+			UART_RX,
+			UART_PIN_NO_CHANGE,
+			UART_PIN_NO_CHANGE
+		)
+	);
 
-    BaseType_t transmit_task_result;
-    BaseType_t receive_task_result;
 
-    //Task that sends commands to HVAC
-    transmit_task_result = xTaskCreate(uart_transmit_task, "UART transmit task", 3072, NULL, 2, NULL);
+	ESP_ERROR_CHECK(
+		uart_driver_install(
+			THERMO_UART,
+			UART_BUFFER_SIZE,
+			UART_BUFFER_SIZE,
+			0,
+			NULL,
+			0
+		)
+	);
 
-    if(transmit_task_result != pdPASS)
-    {
-        printf("Failed to create UART transmit task \n");
-        return;
-    }
 
-    //Task that receives HVAC state and fault values
-    receive_task_result = xTaskCreate(uart_receive_task, "UART receive task", 3072, NULL, 2, NULL);
+	printf(
+		"Thermostat UART initialized\n"
+	);
 
-    if (receive_task_result !=pdPASS)
-    {
-        printf("Failed to create UART receive task \n");
-        return;
-    }
 
-    printf("UART communication tasks were successfully created \n");
+	BaseType_t result = xTaskCreate(
+		uart_transmit_task,
+		"uart_transmit",
+		3072,
+		NULL,
+		2,
+		NULL
+	);
+
+
+	if (result != pdPASS) {
+
+		printf(
+			"Failed to create UART transmit task\n"
+		);
+
+		return;
+	}
+
+
+	result = xTaskCreate(
+		uart_receive_task,
+		"uart_receive",
+		3072,
+		NULL,
+		2,
+		NULL
+	);
+
+
+	if (result != pdPASS) {
+
+		printf(
+			"Failed to create UART receive task\n"
+		);
+
+		return;
+	}
+
+
+	printf(
+		"UART communication tasks started\n"
+	);
 }
+
+
+/* ============================================================
+ * UART TRANSMIT TASK
+ * ============================================================ */
 
 void uart_transmit_task(void *pvParameters)
 {
-    int bytes_sent;
+	(void)pvParameters;
 
-    while (1)
-    {
-        //Sends the current command in one byte
-        bytes_sent = uart_write_bytes(THERMO_UART, &thermostat_command,sizeof(thermostat_command));
-        if(bytes_sent == 1)
-        {
-            printf("%u command sent successfully\n", thermostat_command);
-        }
-        else
-        {
-            printf("Failed to send a command to HVAC\n");
-        }
-        vTaskDelay(pdMS_TO_TICKS(UART_TRANSMIT_PERIOD_MS));
-    }
+	uint8_t buffer[
+		THERMOSTAT_PACKET_SIZE
+	];
+
+
+	while (1) {
+
+		/* ----------------------------------------------------
+		 * Byte 0 = HVAC command
+		 * ---------------------------------------------------- */
+
+		buffer[0] =
+			(uint8_t)thermostat_command;
+
+
+		/* ----------------------------------------------------
+		 * Bytes 1-4 = timestamp
+		 * ---------------------------------------------------- */
+
+		uint32_t timestamp_us =
+			(uint32_t)esp_timer_get_time();
+
+
+		memcpy(
+			&buffer[1],
+			&timestamp_us,
+			sizeof(timestamp_us)
+		);
+
+
+		/* ----------------------------------------------------
+		 * Byte 5 = checksum
+		 * ---------------------------------------------------- */
+
+		buffer[5] =
+			calculate_checksum(
+				buffer,
+				5
+			);
+
+
+		/* ----------------------------------------------------
+		 * Send packet
+		 * ---------------------------------------------------- */
+
+		int bytes_sent =
+			uart_write_bytes(
+				THERMO_UART,
+				buffer,
+				sizeof(buffer)
+			);
+
+
+		if (bytes_sent ==
+			sizeof(buffer)) {
+
+			printf(
+				"UART TX: Command = %d\n",
+				thermostat_command
+			);
+		}
+		else {
+
+			printf(
+				"UART TX failed\n"
+			);
+		}
+
+
+		vTaskDelay(
+			pdMS_TO_TICKS(
+				UART_TRANSMIT_PERIOD_MS
+			)
+		);
+	}
 }
+
+
+/* ============================================================
+ * UART RECEIVE TASK
+ * ============================================================ */
 
 void uart_receive_task(void *pvParameters)
 {
-    uint8_t received_buffer[2];
-    int bytes_received;
+	(void)pvParameters;
 
-    while (1)
-    {
-        bytes_received = uart_read_bytes(THERMO_UART, received_buffer, sizeof(received_buffer), pdMS_TO_TICKS(1000));
-        
-        //Checks if both bytes were received
-        if (bytes_received == 2)
-        {
-            current_hvac_state = received_buffer[0];
-            current_hvac_fault = received_buffer[1];
+	uint8_t buffer[
+		HVAC_STATUS_PACKET_SIZE
+	];
 
-            printf("Current HVAC state is: %u, HVAC fault: %u \n", current_hvac_state, current_hvac_fault);
-        }
-    }
+
+	while (1) {
+
+		int bytes_received =
+			uart_read_bytes(
+				THERMO_UART,
+				buffer,
+				sizeof(buffer),
+				pdMS_TO_TICKS(1000)
+			);
+
+
+		if (bytes_received !=
+			HVAC_STATUS_PACKET_SIZE) {
+
+			continue;
+		}
+
+
+		/* ----------------------------------------------------
+		 * Verify checksum
+		 * ---------------------------------------------------- */
+
+		uint8_t calculated_checksum =
+			calculate_checksum(
+				buffer,
+				8
+			);
+
+
+		if (calculated_checksum !=
+			buffer[8]) {
+
+			printf(
+				"UART RX: Invalid checksum\n"
+			);
+
+			continue;
+		}
+
+
+		/* ----------------------------------------------------
+		 * Store received HVAC status
+		 * ---------------------------------------------------- */
+
+		current_hvac_state =
+			buffer[0];
+
+		current_hvac_fault =
+			buffer[1];
+
+		current_hvac_fan =
+			buffer[2];
+
+		current_hvac_heater =
+			buffer[3];
+
+
+		/* ----------------------------------------------------
+		 * Display received data
+		 * ---------------------------------------------------- */
+
+		printf(
+			"\n"
+			"=============== UART RX ===============\n"
+			"HVAC State:   %u\n"
+			"HVAC Fault:   %u\n"
+			"Fan State:    %u\n"
+			"Heater State: %u\n"
+			"=======================================\n",
+			current_hvac_state,
+			current_hvac_fault,
+			current_hvac_fan,
+			current_hvac_heater
+		);
+	}
 }

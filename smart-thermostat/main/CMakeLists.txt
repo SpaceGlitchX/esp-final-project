@@ -2,7 +2,7 @@ idf_component_register(
                         SRCS 
                             "LCD.h"
                             "thermo_sensors.h"
-                            "LCD.c"
+                           
                             "thermo_sensors.c"
                             "ui.c"
                             "ui.h"
