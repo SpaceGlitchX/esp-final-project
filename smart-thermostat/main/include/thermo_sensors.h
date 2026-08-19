@@ -1,13 +1,16 @@
 #ifndef THERMO_SENSORS_H
 #define THERMO_SENSORS_H
 
+#include <stdint.h>
+
 #include "esp_adc/adc_oneshot.h"
-#include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-#define INDOOR_TEMP_CHANNEL ADC_CHANNEL_0
-#define OUTDOOR_TEMP_CHANNEL ADC_CHANNEL_3
+#define INDOOR_TEMP_CHANNEL ADC_CHANNEL_6 // GPIO PIN 34
+#define OUTDOOR_TEMP_CHANNEL ADC_CHANNEL_4 // GPIO PIN 32
 
-#define SENSOR_PERIOD_MS 1000
+#define SENSOR_PERIOD_MS 10000
 
 typedef struct {
 	int indoor_temp;
@@ -15,15 +18,9 @@ typedef struct {
 } SensorData;
 
 void thermo_sensors_init(void);
-
 void temperature_sensor_task(void *pvParameters);
 
-float thermo_sensors_get_indoor_temperature(void);
-
-float thermo_sensors_get_outdoor_temperature(void);
-
-int thermo_sensors_get_indoor_adc(void);
-
-int thermo_sensors_get_outdoor_adc(void);
+int get_indoor_adc(void);
+int get_outdoor_adc(void);
 
 #endif

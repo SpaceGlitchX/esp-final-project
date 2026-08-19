@@ -12,9 +12,6 @@
 #include "freertos/task.h"
 
 
-static const char *TAG = "THERMO_COMMS";
-
-
 #define UART_TRANSMIT_PERIOD_MS 10000
 
 #define THERMOSTAT_PACKET_SIZE 6

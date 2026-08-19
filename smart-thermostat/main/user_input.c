@@ -1,4 +1,4 @@
-#include "ui.h"
+#include "user_input.h"
 
 #include <stdio.h>
 
@@ -8,13 +8,13 @@
 
 #include "driver/gpio.h"
 
-#include "thermo_logic.h"
 #include "thermo_comms.h"
-
+#include "thermo_logic.h"
 
 static QueueHandle_t thermo_queue = NULL;
 
 static int fan_mode = 0;
+static int system_on = 0;
 
 
 /* ============================================================
@@ -43,7 +43,7 @@ static void IRAM_ATTR isr_handler(void *arg)
  * USER INPUT TASK
  * ============================================================ */
 
-static void user_input_task(void *pvParameters)
+void user_input_monitor(void *pvParameters)
 {
 	(void)pvParameters;
 
@@ -59,40 +59,69 @@ static void user_input_task(void *pvParameters)
 
 			switch (button_id) {
 
+				/* ------------------------------------------------
+				 * TEMPERATURE UP
+				 * ------------------------------------------------ */
+
 				case TEMP_UP:
 
 					set_setpoint(1);
 
 					printf(
-						"Setpoint: %.1f C\n",
+						"Setpoint increased: %.1f C\n",
 						get_setpoint()
 					);
 
 					break;
 
+
+				/* ------------------------------------------------
+				 * TEMPERATURE DOWN
+				 * ------------------------------------------------ */
 
 				case TEMP_DOWN:
 
 					set_setpoint(0);
 
 					printf(
-						"Setpoint: %.1f C\n",
+						"Setpoint decreased: %.1f C\n",
 						get_setpoint()
 					);
 
 					break;
 
 
+				/* ------------------------------------------------
+				 * POWER BUTTON
+				 * ------------------------------------------------ */
+
 				case POWER:
 
-					thermostat_command = CMD_OFF;
+					system_on = !system_on;
 
-					printf(
-						"Power: OFF\n"
-					);
+					if (system_on) {
+
+						thermostat_command = CMD_HEAT;
+
+						printf(
+							"System ON\n"
+						);
+
+					} else {
+
+						thermostat_command = CMD_OFF;
+
+						printf(
+							"System OFF\n"
+						);
+					}
 
 					break;
 
+
+				/* ------------------------------------------------
+				 * FAN MODE
+				 * ------------------------------------------------ */
 
 				case FAN_MODE:
 
@@ -100,15 +129,17 @@ static void user_input_task(void *pvParameters)
 
 					if (fan_mode == 0) {
 
-						thermostat_command = CMD_FAN_AUTO;
+						thermostat_command =
+							CMD_FAN_AUTO;
 
 						printf(
 							"Fan mode: AUTO\n"
 						);
-					}
-					else {
 
-						thermostat_command = CMD_FAN_ON;
+					} else {
+
+						thermostat_command =
+							CMD_FAN_ON;
 
 						printf(
 							"Fan mode: ON\n"
@@ -131,7 +162,7 @@ static void user_input_task(void *pvParameters)
  * INITIALIZATION
  * ============================================================ */
 
-void ui_init(void)
+void user_input_init(void)
 {
 	thermo_queue = xQueueCreate(
 		10,
@@ -141,7 +172,7 @@ void ui_init(void)
 	if (thermo_queue == NULL) {
 
 		printf(
-			"Failed to create UI queue\n"
+			"Failed to create user input queue\n"
 		);
 
 		return;
@@ -149,7 +180,17 @@ void ui_init(void)
 
 
 	/* --------------------------------------------------------
-	 * Button GPIO configuration
+	 * Initial values
+	 * -------------------------------------------------------- */
+
+	fan_mode = 0;
+	system_on = 0;
+
+	thermostat_command = CMD_OFF;
+
+
+	/* --------------------------------------------------------
+	 * Configure buttons
 	 * -------------------------------------------------------- */
 
 	uint64_t input_buttons =
@@ -176,7 +217,7 @@ void ui_init(void)
 
 
 	/* --------------------------------------------------------
-	 * Install GPIO ISR service
+	 * Install ISR service
 	 * -------------------------------------------------------- */
 
 	ESP_ERROR_CHECK(
@@ -229,7 +270,7 @@ void ui_init(void)
 	 * -------------------------------------------------------- */
 
 	BaseType_t result = xTaskCreate(
-		user_input_task,
+		user_input_monitor,
 		"user_input",
 		3072,
 		NULL,

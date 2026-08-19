@@ -6,7 +6,7 @@
 #include "thermo_sensors.h"
 #include "thermo_logic.h"
 #include "thermo_comms.h"
-#include "ui.h"
+#include "user_input.h"
 
 
 void app_main(void)
@@ -19,38 +19,12 @@ void app_main(void)
 	);
 
 
-	/* --------------------------------------------------------
-	 * Initialize temperature sensors
-	 * -------------------------------------------------------- */
-
 	thermo_sensors_init();
-
-
-	/* --------------------------------------------------------
-	 * Initialize UART communication
-	 * -------------------------------------------------------- */
-
 	thermo_comms_init();
-
-
-	/* --------------------------------------------------------
-	 * Initialize buttons
-	 * -------------------------------------------------------- */
-
-	ui_init();
-
-
-	/* --------------------------------------------------------
-	 * Initialize thermostat logic
-	 * -------------------------------------------------------- */
-
 	thermo_logic_init();
+	user_input_init();
 
-
-	printf(
-		"\n"
-		"Thermostat initialization complete\n"
-	);
+	printf("Thermostat app_main initialization complete\n");
 
 
 	while (1) {

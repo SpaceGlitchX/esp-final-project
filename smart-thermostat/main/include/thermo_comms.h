@@ -7,7 +7,6 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 
-#include "hvac_states.h"
 
 
 /* ============================================================
