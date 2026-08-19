@@ -190,9 +190,9 @@ void temperature_sensor_task(void *pvParameters)
  * GET INDOOR ADC
  * ============================================================ */
 
-int get_indoor_adc(void)
+float get_indoor_temperature(void)
 {
-	return temp.indoor_temp;
+	return (float)temp.indoor_temp;
 }
 
 
@@ -200,7 +200,7 @@ int get_indoor_adc(void)
  * GET OUTDOOR ADC
  * ============================================================ */
 
-int get_outdoor_adc(void)
+float get_outdoor_temperature(void)
 {
-	return temp.outdoor_temp;
+	return (float)temp.outdoor_temp;
 }

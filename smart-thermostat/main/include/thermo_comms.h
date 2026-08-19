@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
+#include "hvac_states.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 

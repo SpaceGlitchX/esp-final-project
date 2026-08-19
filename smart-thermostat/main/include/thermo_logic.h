@@ -2,6 +2,7 @@
 #define THERMO_LOGIC_H
 
 #include <stdbool.h>
+#include "hvac_states.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

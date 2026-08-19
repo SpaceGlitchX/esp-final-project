@@ -15,7 +15,7 @@ static QueueHandle_t thermo_queue = NULL;
 
 static int fan_mode = 0;
 static int system_on = 0;
-
+extern hvac_cmd_t thermostat_command;
 
 /* ============================================================
  * BUTTON ISR

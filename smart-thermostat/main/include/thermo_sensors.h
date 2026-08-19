@@ -2,7 +2,7 @@
 #define THERMO_SENSORS_H
 
 #include <stdint.h>
-
+#include "hvac_states.h"
 #include "esp_adc/adc_oneshot.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -20,7 +20,7 @@ typedef struct {
 void thermo_sensors_init(void);
 void temperature_sensor_task(void *pvParameters);
 
-int get_indoor_adc(void);
-int get_outdoor_adc(void);
+extern float get_indoor_adc(void);
+extern float get_outdoor_adc(void);
 
 #endif

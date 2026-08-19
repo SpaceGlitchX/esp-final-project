@@ -4,6 +4,7 @@ idf_component_register(
 		"thermo_logic.c"
 		"thermo_comms.c"
 		"user_input.c"
+		"main.c"
 
 	INCLUDE_DIRS
 		"include"

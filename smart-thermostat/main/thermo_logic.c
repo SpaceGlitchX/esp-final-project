@@ -77,27 +77,6 @@ float get_setpoint(void)
 	return current_setpoint;
 }
 
-
-/* ============================================================
- * GET INDOOR TEMPERATURE
- * ============================================================ */
-
-float get_indoor_temperature(void)
-{
-	return thermo_sensors_get_indoor_temperature();
-}
-
-
-/* ============================================================
- * GET OUTDOOR TEMPERATURE
- * ============================================================ */
-
-float get_outdoor_temperature(void)
-{
-	return thermo_sensors_get_outdoor_temperature();
-}
-
-
 /* ============================================================
  * HEATING REQUIRED
  * ============================================================ */
