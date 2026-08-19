@@ -107,11 +107,22 @@ esp_err_t hvac_state_machine_init(void) {
     g_current_hvac_fault = FLT_NONE;
     safe_shutdown_actuators();
 
-    ESP_LOGI(TAG, "HVAC State Machine Initialized Successfully.");
-    return ESP_OK;
+    BaseType_t task_result = xTaskCreate(
+    hvac_state_machine_task,
+    "hvac_state_machine",
+    2048,
+    NULL,
+    5,
+    NULL
+    );
 
-    xTaskCreate(hvac_state_machine_task, "hvac_state_machine", 2048, NULL, 5, NULL);
-}
+    if (task_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create HVAC state machine task!");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+    }
 
 /**
  * Main HVAC Finite State Machine Task
@@ -206,6 +217,7 @@ void hvac_state_machine_task(void *pvParameters) {
                     } else if (event == CMD_TACH_TIMEOUT) {
                         safe_shutdown_actuators();
                         update_fault(FLT_FAN);
+                        
                         update_state(STATE_FAULT);
                     }
                     break;

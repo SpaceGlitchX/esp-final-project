@@ -1,8 +1,7 @@
 idf_component_register(
     SRCS 
         
-        "main.c"
-        "test_harness.c"
+        "therm.c"
         
     INCLUDE_DIRS 
         "."
@@ -20,4 +19,5 @@ idf_component_register(
         freertos
         esp_driver_pcnt
         console
+        data_log
 )

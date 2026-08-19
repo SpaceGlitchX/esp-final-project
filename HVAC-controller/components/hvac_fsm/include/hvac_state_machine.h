@@ -6,6 +6,7 @@
 #include "freertos/timers.h"
 #include "esp_err.h"
 #include "hvac_states.h"
+#include "data_logger.h"
 
 // Command queue for sending events/commands to the state machine task
 extern QueueHandle_t hvac_queue;
