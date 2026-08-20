@@ -15,7 +15,7 @@
 
 extern hvac_cmd_t thermostat_command;
 
-void user_input_init(void);
+extern void user_input_init(void);
 
 void user_input_monitor(void *pvParameters);
 

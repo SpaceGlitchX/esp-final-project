@@ -4,15 +4,17 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/semphr.h"
+#include "freertos/queue.h"
 
-#include "thermo_sensors.h"
+#include "sensor_manager.h"
 #include "thermo_comms.h"
 
-static SemaphoreHandle_t setpoint_mutex = NULL;
 
-static float setpoint = SETPOINT_START;
+/* ============================================================
+ * GLOBAL DATA
+ * ============================================================ */
 
+float setpoint = SETPOINT_START;
 
 /* ============================================================
  * SETPOINT
@@ -20,36 +22,30 @@ static float setpoint = SETPOINT_START;
 
 void set_setpoint(int level)
 {
-	if (setpoint_mutex == NULL) {
-		return;
-	}
+    if (level == 1)
+    {
+        setpoint += SETPOINT_STEP;
 
-	xSemaphoreTake(
-		setpoint_mutex,
-		portMAX_DELAY
-	);
+        if (setpoint > MAX_SETPOINT)
+        {
+            setpoint = MAX_SETPOINT;
+        }
+    }
+    else
+    {
+        setpoint -= SETPOINT_STEP;
 
-	if (level == 1) {
-		setpoint += SETPOINT_STEP;
+        if (setpoint < MIN_SETPOINT)
+        {
+            setpoint = MIN_SETPOINT;
+        }
+    }
 
-		if (setpoint > MAX_SETPOINT) {
-			setpoint = MAX_SETPOINT;
-		}
-	}
-	else {
-		setpoint -= SETPOINT_STEP;
 
-		if (setpoint < MIN_SETPOINT) {
-			setpoint = MIN_SETPOINT;
-		}
-	}
-
-	xSemaphoreGive(setpoint_mutex);
-
-	printf(
-		"Setpoint: %.1f C\n",
-		setpoint
-	);
+    printf(
+        "Setpoint: %.1f C\n",
+        setpoint
+    );
 }
 
 
@@ -59,23 +55,9 @@ void set_setpoint(int level)
 
 float get_setpoint(void)
 {
-	float current_setpoint;
-
-	if (setpoint_mutex == NULL) {
-		return setpoint;
-	}
-
-	xSemaphoreTake(
-		setpoint_mutex,
-		portMAX_DELAY
-	);
-
-	current_setpoint = setpoint;
-
-	xSemaphoreGive(setpoint_mutex);
-
-	return current_setpoint;
+    return setpoint;
 }
+
 
 /* ============================================================
  * HEATING REQUIRED
@@ -83,17 +65,15 @@ float get_setpoint(void)
 
 bool heating_required(void)
 {
-	float indoor_temperature = get_indoor_temperature();
+    
+    if (indoor_temp <
+        (setpoint - DEADBAND_C))
+    {
+        return true;
+    }
 
-	float current_setpoint = get_setpoint();
 
-	if (indoor_temperature <
-		(current_setpoint - DEADBAND_C)) {
-
-		return true;
-	}
-
-	return false;
+    return false;
 }
 
 
@@ -103,108 +83,116 @@ bool heating_required(void)
 
 void thermo_control_task(void *pvParameters)
 {
-	(void)pvParameters;
+    (void)pvParameters;
 
-	TickType_t last_wake_time =
-		xTaskGetTickCount();
+    while (1)
+    {
+        /* ----------------------------------------------------
+         * GET NEW TEMPERATURE
+         * ---------------------------------------------------- */
 
-	while (1) {
+        if (xQueueReceive(temp_queue, &current_temp, portMAX_DELAY) == pdTRUE) {
+            indoor_temp = current_temp;
+        }
 
-		float indoor_temperature =
-			get_indoor_temperature();
+        float current_setpoint = get_setpoint();
 
+        /* ----------------------------------------------------
+         * DISPLAY
+         * ---------------------------------------------------- */
 
-		float current_setpoint =
-			get_setpoint();
-
-
-		printf(
-			"\n"
-			"============================================\n"
-			"              THERMOSTAT DATA              \n"
-			"============================================\n"
-		);
-
-		printf(
-			"Indoor:   %.1f C\n",
-			indoor_temperature
-		);
+        printf(
+            "\n"
+            "============================================\n"
+            "              THERMOSTAT DATA              \n"
+            "============================================\n"
+        );
 
 
-		printf(
-			"Setpoint: %.1f C\n",
-			current_setpoint
-		);
+        printf(
+            "Indoor:       %.2f C\n",
+            indoor_temp
+        );
 
 
-		/* ----------------------------------------------------
-		 * Heating decision
-		 * ---------------------------------------------------- */
-
-		if (indoor_temperature <
-			(current_setpoint - DEADBAND_C)) {
-
-			printf(
-				"Heating:  REQUIRED\n"
-			);
-		}
-		else if (indoor_temperature >
-				(current_setpoint + DEADBAND_C)) {
-
-			printf(
-				"Heating:  NOT REQUIRED\n"
-			);
-		}
-		else {
-
-			printf(
-				"Heating:  DEAD BAND\n"
-			);
-		}
+        printf(
+            "Setpoint:     %.1f C\n",
+            current_setpoint
+        );
 
 
-		/* ----------------------------------------------------
-		 * HVAC STATUS RECEIVED THROUGH UART
-		 * ---------------------------------------------------- */
+        /* ----------------------------------------------------
+         * HEATING DECISION
+         * ---------------------------------------------------- */
 
-		printf(
-			"\n"
-			"              HVAC UART DATA              \n"
-			"--------------------------------------------\n"
-		);
-
-		printf(
-			"HVAC State:  %u\n",
-			current_hvac_state
-		);
-
-		printf(
-			"HVAC Fault:  %u\n",
-			current_hvac_fault
-		);
-
-		printf(
-			"Fan State:   %u\n",
-			current_hvac_fan
-		);
-
-		printf(
-			"Heater State: %u\n",
-			current_hvac_heater
-		);
-
-		printf(
-			"============================================\n"
-		);
+        if (indoor_temp <
+            (current_setpoint - DEADBAND_C))
+        {
+            printf(
+                "Heating:      REQUIRED\n"
+            );
+        }
+        else if (
+            indoor_temp >
+            (current_setpoint + DEADBAND_C))
+        {
+            printf(
+                "Heating:      NOT REQUIRED\n"
+            );
+        }
+        else
+        {
+            printf(
+                "Heating:      DEAD BAND\n"
+            );
+        }
 
 
-		vTaskDelayUntil(
-			&last_wake_time,
-			pdMS_TO_TICKS(
-				CONTROL_LOOP_PERIOD_MS
-			)
-		);
-	}
+        /* ----------------------------------------------------
+         * HVAC UART DATA
+         * ---------------------------------------------------- */
+
+        printf(
+            "\n"
+            "              HVAC UART DATA              \n"
+            "--------------------------------------------\n"
+        );
+
+
+        printf(
+            "HVAC State:   %u\n",
+            current_hvac_state
+        );
+
+
+        printf(
+            "HVAC Fault:   %u\n",
+            current_hvac_fault
+        );
+
+
+        printf(
+            "Fan State:    %u\n",
+            current_hvac_fan
+        );
+
+
+        printf(
+            "Heater State: %u\n",
+            current_hvac_heater
+        );
+
+
+        printf(
+            "============================================\n"
+        );
+
+
+        /* ----------------------------------------------------
+         * CONTROL LOOP
+         * ---------------------------------------------------- */
+
+    }
 }
 
 
@@ -214,49 +202,46 @@ void thermo_control_task(void *pvParameters)
 
 void thermo_logic_init(void)
 {
-	setpoint_mutex =
-		xSemaphoreCreateMutex();
-
-	if (setpoint_mutex == NULL) {
-
-		printf(
-			"Failed to create setpoint mutex\n"
-		);
-
-		return;
-	}
-
-	setpoint = SETPOINT_START;
-
-	printf(
-		"Thermostat logic initialized\n"
-	);
-
-	printf(
-		"Initial setpoint: %.1f C\n",
-		setpoint
-	);
+    indoor_temp = 0.0;
+    float setpoint =
+        SETPOINT_START;
 
 
-	BaseType_t result = xTaskCreate(
-		thermo_control_task,
-		"thermo_control",
-		3072,
-		NULL,
-		2,
-		NULL
-	);
 
-	if (result != pdPASS) {
 
-		printf(
-			"Failed to create thermostat control task\n"
-		);
+    printf(
+        "Thermostat logic initialized\n"
+    );
 
-		return;
-	}
 
-	printf(
-		"Thermostat control task started\n"
-	);
+    printf(
+        "Initial setpoint: %.1f C\n",
+        setpoint
+    );
+
+
+    BaseType_t result =
+        xTaskCreate(
+            thermo_control_task,
+            "thermo_control",
+            3072,
+            NULL,
+            2,
+            NULL
+        );
+
+
+    if (result != pdPASS)
+    {
+        printf(
+            "Failed to create thermostat control task\n"
+        );
+
+        return;
+    }
+
+
+    printf(
+        "Thermostat control task started\n"
+    );
 }

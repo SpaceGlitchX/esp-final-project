@@ -2,8 +2,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
-#include "thermo_sensors.h"
+#include "sensor_manager.h"
 #include "thermo_logic.h"
 #include "thermo_comms.h"
 #include "user_input.h"
@@ -11,25 +10,66 @@
 
 void app_main(void)
 {
-	printf(
-		"\n"
-		"============================================\n"
-		"       THERMOSTAT SYSTEM STARTING          \n"
-		"============================================\n"
-	);
+    printf("\n");
+    printf("============================================\n");
+    printf("       THERMOSTAT SYSTEM STARTING\n");
+    printf("============================================\n");
+
+    fflush(stdout);
 
 
-	thermo_comms_init();
-	thermo_logic_init();
-	thermo_sensors_init();
-	user_input_init();
+    /*
+     * Initialize temperature sensor FIRST.
+     *
+     * This creates:
+     * - ADC
+     * - ADC calibration
+     * - temperature queue
+     * - temperature sensor task
+     */
 
-	printf("Thermostat app_main initialization complete\n");
+	sensor_manager_init();
+
+    /*
+     * Initialize UART communication.
+     */
+
+    thermo_comms_init();
 
 
-	while (1) {
-		vTaskDelay(
-			pdMS_TO_TICKS(1000)
-		);
-	}
+    /*
+     * Initialize thermostat logic.
+     *
+     * This creates the control task that reads
+     * temperature from the queue.
+     */
+
+    thermo_logic_init();
+
+
+    /*
+     * Initialize buttons / user input.
+     */
+
+    user_input_init();
+
+
+    printf("\n");
+    printf("============================================\n");
+    printf(" Thermostat app_main initialization complete\n");
+    printf("============================================\n");
+
+    fflush(stdout);
+
+
+    /*
+     * app_main stays alive.
+     */
+
+    while (1)
+    {
+        vTaskDelay(
+            pdMS_TO_TICKS(1000)
+        );
+    }
 }

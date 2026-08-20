@@ -14,11 +14,9 @@
 #define MIN_SETPOINT 10.0f
 #define MAX_SETPOINT 30.0f
 #define DEADBAND_C 0.5f
-
-void thermo_logic_init(void);
+extern void thermo_logic_init(void);
 void set_setpoint(int level);
 float get_setpoint(void);
-float get_indoor_temperature(void);
 bool heating_required(void);
 void thermo_control_task(void *pvParameters);
 

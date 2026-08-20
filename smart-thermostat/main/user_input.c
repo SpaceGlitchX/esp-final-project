@@ -7,7 +7,7 @@
 #include "freertos/task.h"
 
 #include "driver/gpio.h"
-
+#include "sensor_manager.h"
 #include "thermo_comms.h"
 #include "thermo_logic.h"
 

@@ -47,7 +47,7 @@ extern hvac_cmd_t thermostat_command;
  * FUNCTIONS
  * ============================================================ */
 
-void thermo_comms_init(void);
+extern void thermo_comms_init(void);
 
 void uart_transmit_task(void *pvParameters);
 
