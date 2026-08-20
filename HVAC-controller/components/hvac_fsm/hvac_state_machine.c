@@ -30,7 +30,6 @@ static void update_state(hvac_state_t state)
 
   g_current_hvac_state = state;
 
-  data_logger_log_event(LOG_EVENT_STATE_CHANGE);
 }
 
 //~ FAULT UPDATE
@@ -43,7 +42,6 @@ static void update_fault(hvac_flt_t fault)
 
   g_current_hvac_fault = fault;
 
-  data_logger_log_event(LOG_EVENT_FAULT);
 }
 
 //~ SAFE SHUTDOWN
@@ -166,7 +164,6 @@ void hvac_state_machine_task(void *pvParameters)
     {
 
       g_current_hvac_cmd = event;
-      data_logger_log_event(LOG_EVENT_COMMAND);
 
       // GLOBAL OFF COMMAND
       if (event == CMD_OFF)

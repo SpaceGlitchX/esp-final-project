@@ -19,9 +19,9 @@ void app_main(void)
 	);
 
 
-	thermo_sensors_init();
 	thermo_comms_init();
 	thermo_logic_init();
+	thermo_sensors_init();
 	user_input_init();
 
 	printf("Thermostat app_main initialization complete\n");

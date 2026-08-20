@@ -113,8 +113,6 @@ void thermo_control_task(void *pvParameters)
 		float indoor_temperature =
 			get_indoor_temperature();
 
-		float outdoor_temperature =
-			get_outdoor_temperature();
 
 		float current_setpoint =
 			get_setpoint();
@@ -132,10 +130,6 @@ void thermo_control_task(void *pvParameters)
 			indoor_temperature
 		);
 
-		printf(
-			"Outdoor:  %.1f C\n",
-			outdoor_temperature
-		);
 
 		printf(
 			"Setpoint: %.1f C\n",
@@ -155,7 +149,7 @@ void thermo_control_task(void *pvParameters)
 			);
 		}
 		else if (indoor_temperature >
-				 (current_setpoint + DEADBAND_C)) {
+				(current_setpoint + DEADBAND_C)) {
 
 			printf(
 				"Heating:  NOT REQUIRED\n"
