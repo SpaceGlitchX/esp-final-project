@@ -1,12 +1,21 @@
 idf_component_register(
-                        SRCS 
-                            "LCD.h"
-                            "thermo_sensors.h"
-                            "LCD.c"
-                            "thermo_sensors.c"
-                            "ui.c"
-                            "ui.h"
-                        REQUIRES "driver" "esp_driver_gpio" "esp_adc" "esp_timer" "esp_driver_ledc"
+	SRCS
+		"temperature_sensor.c"
+		"sensor_manager.c"
+		"thermo_logic.c"
+		"thermo_comms.c"
+		"user_input.c"
+		"main.c"
 
-                            
-                        INCLUDE_DIRS ".")
+	INCLUDE_DIRS
+		"include"
+
+	REQUIRES
+		esp_adc
+		esp_driver_gpio
+		esp_timer
+		freertos
+		console
+		driver
+		esp_driver_uart
+)

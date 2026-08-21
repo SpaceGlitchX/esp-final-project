@@ -16,19 +16,18 @@ extern hvac_flt_t g_current_hvac_fault;
 extern hvac_cmd_t g_current_hvac_cmd;
 
 /**
- * @brief Hardware Emergency Interrupt Handler
+ * Hardware Emergency Interrupt Handler
  */
-void fault_isr_handler(void *arg);
+void fault_isr_handler(void* arg);
 
 /**
- * @brief Initializes state variables, queues, and timer resources.
- * @return esp_err_t ESP_OK on success, ESP_FAIL on failure.
+ * Initializes state variables, queues, and timer resources.
  */
-extern esp_err_t hvac_state_machine_init(void);
+esp_err_t hvac_state_machine_init(void);
 
 /**
- * @brief Main HVAC Finite State Machine Task
+ * Main HVAC Finite State Machine Task
  */
-void hvac_state_machine_task(void *pvParameters);
+void hvac_state_machine_task(void* pvParameters);
 
 #endif // HVAC_STATE_MACHINE_H

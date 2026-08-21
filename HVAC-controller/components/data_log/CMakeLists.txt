@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS
-        "hvac_comms.c"
+        "data_logger.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
@@ -9,4 +9,5 @@ idf_component_register(
         log
         sensors
         hardware
+        hvac_comms
 )

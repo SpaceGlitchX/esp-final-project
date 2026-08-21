@@ -19,10 +19,10 @@ extern TimerHandle_t tach_window_timer;
 extern QueueHandle_t hvac_queue;
 
 // function handles
-void init_hvac_hardware(void);
+void hvac_hardware_init(void);
 void set_heater_state(int level);
 void set_fan_state(int level);
-int get_fan_state(void);
-int get_heater_state(void);
+extern int get_fan_state(void);
+extern int get_heater_state(void);
 
 #endif

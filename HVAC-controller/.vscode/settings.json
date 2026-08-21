@@ -1,23 +1,50 @@
 {
-  "C_Cpp.intelliSenseEngine": "default",
-  "idf.extensionActivationMode": "always",
-  "idf.openOcdConfigs": [
-    "interface/ftdi/esp32_devkitj_v1.cfg",
-    "target/esp32.cfg"
-  ],
-  "idf.port": "detect",
-  "idf.currentSetup": "C:\\esp\\v6.0.2\\esp-idf",
-  "idf.customExtraVars": {
-    "IDF_TARGET": "esp32"
-  },
-  "clangd.path": "/home/escapegoat/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
-  "clangd.arguments": [
-    "--background-index",
-    "--query-driver=**",
-    "--compile-commands-dir=/home/escapegoat/esp-final-project/HVAC-controller/build"
-  ],
-  "C_Cpp.errorSquiggles": "disabled",
-  "idf.flashType": "UART",
-  "idf.portWin": "COM8",
-  "idf.monitorPort": "COM8"
+    "C_Cpp.intelliSenseEngine": "default",
+    "idf.extensionActivationMode": "always",
+
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp32_devkitj_v1.cfg",
+        "target/esp32.cfg"
+    ],
+
+    "idf.port": "detect",
+    "idf.currentSetup": "C:\\esp\\v6.0.2\\esp-idf",
+
+    "idf.customExtraVars": {
+        "IDF_TARGET": "esp32"
+    },
+
+    "clangd.path": "/home/escapegoat/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clangd",
+
+    "clangd.arguments": [
+        "--background-index",
+        "--query-driver=**",
+        "--compile-commands-dir=/home/escapegoat/esp-final-project/HVAC-controller/build"
+    ],
+
+    "C_Cpp.errorSquiggles": "disabled",
+    "idf.flashType": "UART",
+    "idf.portWin": "COM8",
+    "idf.monitorPort": "COM8",
+
+    "C_Cpp.formatting": "default",
+
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "sameLine",
+    "C_Cpp.vcFormat.space.beforeInitializerListOpenBrace": true,
+
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": false,
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false
+    },
+
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": false,
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false
+    },
+
+    "C_Cpp.clang_format_style": ".prettierrc"
 }

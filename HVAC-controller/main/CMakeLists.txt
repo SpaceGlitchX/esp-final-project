@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS 
         
-        "hvac_test_commands.c"
+        "therm.c"
         
     INCLUDE_DIRS 
         "."
@@ -19,4 +19,5 @@ idf_component_register(
         freertos
         esp_driver_pcnt
         console
+        data_log
 )
