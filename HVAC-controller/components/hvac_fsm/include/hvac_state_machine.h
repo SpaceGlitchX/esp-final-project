@@ -1,33 +1,42 @@
 #ifndef HVAC_STATE_MACHINE_H
 #define HVAC_STATE_MACHINE_H
 
+#include "esp_err.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "freertos/timers.h"
-#include "esp_err.h"
+#include "freertos/task.h"
+
 #include "hvac_states.h"
 
-// Command queue for sending events/commands to the state machine task
+/* ============================================================
+ * Global Handles
+ * ============================================================ */
+
 extern QueueHandle_t hvac_queue;
+extern SemaphoreHandle_t hvac_state_mutex;
 
-// Exported globally for testing and monitoring
-extern hvac_state_t g_current_hvac_state;
-extern hvac_flt_t g_current_hvac_fault;
-extern hvac_cmd_t g_current_hvac_cmd;
+/* ============================================================
+ * State Machine Timers
+ * ============================================================ */
 
-/**
- * Hardware Emergency Interrupt Handler
- */
-void fault_isr_handler(void* arg);
+extern TimerHandle_t fan_warmup_timer;
+extern TimerHandle_t fan_cooldown_timer;
 
-/**
- * Initializes state variables, queues, and timer resources.
- */
-esp_err_t hvac_state_machine_init(void);
+/* ============================================================
+ * Initialization
+ * ============================================================ */
 
-/**
- * Main HVAC Finite State Machine Task
- */
-void hvac_state_machine_task(void* pvParameters);
+esp_err_t state_machine_init(void);
 
-#endif // HVAC_STATE_MACHINE_H
+/* ============================================================
+ * State / Fault Getters
+ * ============================================================ */
+
+hvac_state_t hvac_get_state(void);
+hvac_flt_t hvac_get_fault(void);
+hvac_cmd_t hvac_get_command(void);
+
+#endif /* HVAC_STATE_MACHINE_H */

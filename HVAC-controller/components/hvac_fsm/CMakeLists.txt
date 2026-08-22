@@ -9,5 +9,5 @@ idf_component_register(
         log
         sensors
         hardware
-        data_log
+        
 )

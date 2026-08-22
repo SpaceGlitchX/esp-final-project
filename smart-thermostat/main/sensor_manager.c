@@ -4,6 +4,7 @@ extern TempSensor temp_sensor;
 
 TimerHandle_t temp_read_timer = NULL;
 QueueHandle_t temp_queue = NULL;
+
 float current_temp;
 static void temp_read_timer_callback(TimerHandle_t xTimer) {
 	if (temp_sensor.read != NULL) {
@@ -19,8 +20,4 @@ void sensor_manager_init(void) {
 	if (temp_sensor.init != NULL) {
 		temp_sensor.init(&temp_sensor);
 	}
-
-	temp_read_timer = xTimerCreate("TEMP_READ_TIMER", pdMS_TO_TICKS(5000), pdTRUE, NULL, temp_read_timer_callback);
-
-	xTimerStart(temp_read_timer, 1000);
 }

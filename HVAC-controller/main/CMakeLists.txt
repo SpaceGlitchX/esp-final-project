@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS 
         
-        "therm.c"
+        "main.c"
         
     INCLUDE_DIRS 
         "."
@@ -19,5 +19,5 @@ idf_component_register(
         freertos
         esp_driver_pcnt
         console
-        data_log
+        
 )

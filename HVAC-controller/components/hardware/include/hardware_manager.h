@@ -4,25 +4,37 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/timers.h"
+
 #include "hvac_states.h"
 #include "driver/gpio.h"
+#include "esp_err.h"
 #include "esp_log.h"
 
-// Hardware pins
-#define HEATER_PIN 19
-#define FAN_PIN 25
+/* ============================================================
+ * Hardware Pins
+ * ============================================================ */
 
-// Queue and timer handles
-extern TimerHandle_t flame_proving_timer;
-extern TimerHandle_t fan_warmup_timer;
-extern TimerHandle_t tach_window_timer;
-extern QueueHandle_t hvac_queue;
+#define HEATER_PIN GPIO_NUM_19
+#define FAN_PIN    GPIO_NUM_25
 
-// function handles
-void hvac_hardware_init(void);
+/* ============================================================
+ * Hardware Manager
+ * ============================================================ */
+
+esp_err_t hardware_manager_init(void);
+
+/* ============================================================
+ * Actuator Control
+ * ============================================================ */
+
 void set_heater_state(int level);
 void set_fan_state(int level);
-extern int get_fan_state(void);
-extern int get_heater_state(void);
 
-#endif
+/* ============================================================
+ * Actuator Status
+ * ============================================================ */
+
+int get_fan_state(void);
+int get_heater_state(void);
+
+#endif /* HVAC_HARDWARE_H */

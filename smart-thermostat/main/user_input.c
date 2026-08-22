@@ -11,146 +11,60 @@
 #include "thermo_comms.h"
 #include "thermo_logic.h"
 
-static QueueHandle_t thermo_queue = NULL;
+Settings settings = {0};
+QueueHandle_t input_queue = NULL;
+static int fan_on;
+static int system_on;
 
-static int fan_mode = 0;
-static int system_on = 0;
-extern hvac_cmd_t thermostat_command;
 
-/* ============================================================
- * BUTTON ISR
- * ============================================================ */
-
-static void IRAM_ATTR isr_handler(void *arg)
-{
+static void IRAM_ATTR isr_handler(void *arg) {
 	int button = (int)arg;
 
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-	xQueueSendFromISR(
-		thermo_queue,
-		&button,
-		&xHigherPriorityTaskWoken
-	);
+	xQueueSendFromISR(input_queue, &button, &xHigherPriorityTaskWoken);
 
 	if (xHigherPriorityTaskWoken) {
 		portYIELD_FROM_ISR();
 	}
 }
 
+void set_setpoint(struct Settings* self, float level) {
+	if (!self) return;
+	self->setpoint = self->setpoint + level;
+}
 
-/* ============================================================
- * USER INPUT TASK
- * ============================================================ */
-
-void user_input_monitor(void *pvParameters)
+void user_input_task(void *pvParameters)
 {
 	(void)pvParameters;
-
 	int button_id;
+	int fan_on;
+	int system_on;
 
 	while (1) {
 
-		if (xQueueReceive(
-			thermo_queue,
-			&button_id,
-			portMAX_DELAY
-		) == pdTRUE) {
-
+		if (xQueueReceive(input_queue, &button_id, portMAX_DELAY) == pdTRUE) {
+		
 			switch (button_id) {
 
-				/* ------------------------------------------------
-				 * TEMPERATURE UP
-				 * ------------------------------------------------ */
-
 				case TEMP_UP:
-
-					set_setpoint(1);
-
-					printf(
-						"Setpoint increased: %.1f C\n",
-						get_setpoint()
-					);
-
+					set_setpoint(settings, INC_TEMP);
 					break;
-
-
-				/* ------------------------------------------------
-				 * TEMPERATURE DOWN
-				 * ------------------------------------------------ */
 
 				case TEMP_DOWN:
-
-					set_setpoint(0);
-
-					printf(
-						"Setpoint decreased: %.1f C\n",
-						get_setpoint()
-					);
-
+					set_setpoint(settings, DEC_TEMP);
 					break;
-
-
-				/* ------------------------------------------------
-				 * POWER BUTTON
-				 * ------------------------------------------------ */
 
 				case POWER:
-
 					system_on = !system_on;
-
-					if (system_on) {
-
-						thermostat_command = CMD_HEAT;
-
-						printf(
-							"System ON\n"
-						);
-
-					} else {
-
-						thermostat_command = CMD_OFF;
-
-						printf(
-							"System OFF\n"
-						);
-					}
-
+					self->power_mode = system_on;
 					break;
-
-
-				/* ------------------------------------------------
-				 * FAN MODE
-				 * ------------------------------------------------ */
 
 				case FAN_MODE:
-
-					fan_mode = !fan_mode;
-
-					if (fan_mode == 0) {
-
-						thermostat_command =
-							CMD_FAN_AUTO;
-
-						printf(
-							"Fan mode: AUTO\n"
-						);
-
-					} else {
-
-						thermostat_command =
-							CMD_FAN_ON;
-
-						printf(
-							"Fan mode: ON\n"
-						);
-					}
-
+					fan_on = !fan_on;
+					self->fan_mode = fan_on;
 					break;
 
-
 				default:
-
 					break;
 			}
 		}
@@ -162,32 +76,13 @@ void user_input_monitor(void *pvParameters)
  * INITIALIZATION
  * ============================================================ */
 
-void user_input_init(void)
+void user_input_init(struct Settings* self)
 {
-	thermo_queue = xQueueCreate(
-		10,
-		sizeof(int)
-	);
+	if (!self) return;
 
-	if (thermo_queue == NULL) {
-
-		printf(
-			"Failed to create user input queue\n"
-		);
-
-		return;
-	}
-
-
-	/* --------------------------------------------------------
-	 * Initial values
-	 * -------------------------------------------------------- */
-
-	fan_mode = 0;
-	system_on = 0;
-
-	thermostat_command = CMD_OFF;
-
+	self->setpoint = 20.0;
+	self->fan_mode = 0;
+	self->power_mode = 0;
 
 	/* --------------------------------------------------------
 	 * Configure buttons
@@ -269,16 +164,7 @@ void user_input_init(void)
 	 * Create user input task
 	 * -------------------------------------------------------- */
 
-	BaseType_t result = xTaskCreate(
-		user_input_monitor,
-		"user_input",
-		3072,
-		NULL,
-		5,
-		NULL
-	);
-
-
+	xTaskCreate(user_input_task, "button_task", 4096, NULL, 4, NULL);
 	if (result != pdPASS) {
 
 		printf(

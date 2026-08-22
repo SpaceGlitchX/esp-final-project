@@ -1,23 +1,47 @@
 #ifndef TACH_SENSOR_H
 #define TACH_SENSOR_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "esp_err.h"
 #include "driver/pulse_cnt.h"
 #include "driver/gpio.h"
-#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
 
-#define DEFAULT_SAMPLE_PERIOD_MS 1000.0f // 1 second measurement interval
-#define PULSES_PER_REV 2 // Standard 3-wire fans emit 2 pulses per revolution
-#define FAN_TACH_PIN 18
+/* ============================================================
+ * Tachometer Configuration
+ * ============================================================ */
 
-typedef struct TachSensor {
-    pcnt_unit_handle_t pcnt_unit;
-    pcnt_channel_handle_t pcnt_chan;
-    uint32_t fan_rpm;
-    void (*init)(struct TachSensor* self);
-    void (*read)(struct TachSensor* self);
+#define TACH_GPIO_PIN        GPIO_NUM_18
 
-} TachSensor;
+#define TACH_PULSES_PER_REV  2
 
-void tach_sensor_read(TachSensor* self);
-void tach_sensor_init(TachSensor* self);
+#define PCNT_HIGH_LIMIT      10000
+#define PCNT_LOW_LIMIT       -1
 
-#endif 
+#define RPM_SAMPLE_TIME_MS   pdMS_TO_TICKS(100)
+
+/* ============================================================
+ * Fan Validation
+ * ============================================================ */
+
+/* Minimum RPM required for fan to be considered operational */
+#define FAN_MIN_RPM          1200.0f
+
+/* ============================================================
+ * Latest RPM
+ * ============================================================ */
+
+extern uint32_t g_latest_rpm;
+
+/* ============================================================
+ * Public API
+ * ============================================================ */
+
+esp_err_t tach_sensor_init(void);
+
+uint32_t get_tach_sensor_rpm(void);
+
+#endif /* TACH_SENSOR_H */

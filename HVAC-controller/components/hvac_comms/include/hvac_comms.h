@@ -2,25 +2,26 @@
 #define HVAC_COMMS_H
 
 #include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
-#include "driver/gpio.h"
-#include "hvac_state_machine.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/timers.h"
+
 #include "hvac_states.h"
 
 
-#define UART_PORT UART_NUM_1
-#define UART_BAUD_RATE 115200
+#define UART_PORT UART_NUM_0
 
-#define RX_PIN GPIO_NUM_16
-#define TX_PIN GPIO_NUM_17
+#define UART_BAUD_RATE 115200
 
 #define UART_RX_BUFFER_SIZE 256
 #define UART_TX_BUFFER_SIZE 256
 
-extern QueueHandle_t hvac_tx_queue;
-extern TimerHandle_t transmit_timer;
+#define TX_PIN GPIO_NUM_1
+#define RX_PIN GPIO_NUM_3
+
 
 typedef struct
 {
@@ -36,23 +37,36 @@ typedef struct
     hvac_state_t current_state;
     hvac_flt_t current_fault;
 
-    int fan_state;
-    int heater_state;
+    uint8_t fan_state;
+    uint8_t heater_state;
 
     uint32_t timestamp_us;
+
+    uint16_t flame_value;
+    uint32_t fan_rpm;
+
     uint8_t checksum;
 
 } hvac_status_packet_t;
 
 
-extern void uart_init(void);
+/* Handles are defined in hvac_comms.c */
 
+extern QueueHandle_t transmit_queue;
+extern TimerHandle_t transmit_timer;
+
+
+/* Initialization */
+
+void uart_init(void);
+
+
+/* Packet functions */
 
 bool unpack_thermostat_packet(
     thermostat_packet_t *data,
     const uint8_t *buffer
 );
-
 
 void pack_hvac_status_packet(
     hvac_status_packet_t *data,
@@ -60,25 +74,17 @@ void pack_hvac_status_packet(
 );
 
 
-int uart_send(
-    uint8_t *buffer,
-    size_t length
+/* Tasks */
+
+void uart_receive_task(void *pvParameters);
+
+void uart_transmit_task(void *pvParameters);
+
+
+/* Timer */
+
+void transmit_timer_callback(
+    TimerHandle_t timer
 );
 
-
-int uart_receive(
-    uint8_t *buffer,
-    size_t length,
-    uint32_t timeout_ms
-);
-
-
-void uart_receive_task(
-    void *pvParameters
-);
-void uart_transmit_task(
-    void *pvParameters
-);
-
-void transmit_timer_callback(TimerHandle_t xTimer);
-#endif // HVAC_COMMS_H
+#endif

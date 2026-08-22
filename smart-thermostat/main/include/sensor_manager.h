@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
+#include "thermo_sensors.h"
 
 extern TimerHandle_t temp_sample_timer;
 extern TempSensor temp_sensor;

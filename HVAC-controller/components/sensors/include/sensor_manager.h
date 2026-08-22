@@ -1,32 +1,33 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#include "sensor_manager.h"
-#include "flame_sensor.h"
-#include "tach_sensor.h"
+#include <stdint.h>
+
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/timers.h"
-#include "driver/pulse_cnt.h"
-#include "esp_log.h"
-#include <stdio.h>
-#include "hvac_state_machine.h"
 
-// Timer handles (external reference)
-extern TimerHandle_t analog_sample_timer;
-extern TimerHandle_t temp_sample_timer;
-extern TimerHandle_t tach_monitor_timer;
+#include "tach_sensor.h"
+#include "flame_sensor.h"
+#include "hvac_states.h"
 
-// Sensor object declarations (external reference)
-extern FlameSensor flame_sensor;
-extern TachSensor tach_sensor;
+/* Latest sensor values */
+extern uint32_t current_rpm;
+extern uint16_t current_adc;
 
-// API Prototypes
-void sensor_manager_init(void);
-void start_flame_proving_monitor(void);
-void stop_flame_proving_monitor(void);
-void start_tach_monitoring(void);
-void stop_tach_monitoring(void);
+/* Sensor manager initialization */
+esp_err_t sensor_manager_init(void);
 
+/* Flame monitoring */
+void start_flame_check(void);
+void stop_flame_check(void);
 
-#endif
+/* Fan/tach monitoring */
+void start_fan_check(void);
+void stop_fan_check(void);
+
+/* Sensor values */
+uint32_t sensor_get_rpm(void);
+uint16_t sensor_get_flame_adc(void);
+
+#endif /* SENSOR_MANAGER_H */

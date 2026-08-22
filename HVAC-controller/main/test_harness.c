@@ -20,14 +20,14 @@ void test_harness_task(void *pvParameters)
          * TEST 1: FAN ONLY
          * ========================================= */
 
-        cmd = CMD_FAN_ONLY;
+        cmd = CMD_FAN_ON;
 
         if (xQueueSend(
                 hvac_queue,
                 &cmd,
                 pdMS_TO_TICKS(1000)) == pdTRUE)
         {
-            printf("TEST 1: CMD_FAN_ONLY\n");
+            printf("TEST 1: CMD_FAN_ON\n");
         }
         else
         {

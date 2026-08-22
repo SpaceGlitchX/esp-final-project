@@ -24,7 +24,7 @@ static const char *TAG = "FLAME_ADC";
 #define FLAME_ADC_UNIT       ADC_UNIT_1
 #define FLAME_ADC_CHANNEL    ADC_CHANNEL_6
 #define FLAME_ADC_ATTEN      ADC_ATTEN_DB_12
-#define HEATER_PIN GPIO_NUM_18
+#define HEATER_PIN GPIO_NUM_19
 /* =========================
  * ADC HANDLE
  * ========================= */
@@ -110,23 +110,24 @@ void app_main(void)
     
     int raw_value = 0;
 
-    for (int i=0 ; i < 100 ; i++){
+    
+    for (int i=0 ; i < 1000 ; i++){
 
     
         /*
-         * Read ADC using oneshot mode.
-         */
+        * Read ADC using oneshot mode.
+        */
 
 
-        if (i==5) {
+        if (i==200) {
             gpio_set_level(HEATER_PIN, 1);
             printf(" ON ");
         }
-        if (i==20) {
+        if (i==500) {
             gpio_set_level(HEATER_PIN, 0);
             printf(" OFF ");
         }
-         
+        
         ESP_ERROR_CHECK(
             adc_oneshot_read(
                 adc_handle,
@@ -134,22 +135,24 @@ void app_main(void)
                 &raw_value
             )
         );
-       
+    
         /*
-         * Print raw ADC value.
-         */
+        * Print raw ADC value.
+        */
         printf(
             "%.2u,%d\n",
             (unsigned int)(esp_timer_get_time)(),raw_value
         );
 
         /*
-         * Allow the system to continue running.
-         */
+        * Allow the system to continue running.
+        */
         vTaskDelay(
             pdMS_TO_TICKS(10)
         );
-    }
+    
+    
+}
     gpio_set_level(HEATER_PIN, 0);
 
 }

@@ -49,7 +49,7 @@ static const char *TAG = "FAN_TEST";
  *
  * RPM = pulses / pulses_per_rev * 60
  */
-#define RPM_SAMPLE_TIME_MS 1000
+#define RPM_SAMPLE_TIME_MS 500
 
 
 /*
@@ -416,84 +416,84 @@ static void run_fan_test(void)
      * Individual measurements:
      */
 
-    printf(
-        "\nPWM_Percent,Sample,RPM\n"
-    );
+    for (int j =0; j<4;j++) {
 
-
-    /*
-     * Sweep from 0% to 100%.
-     */
-
-    for (
-        uint8_t pwm = 0;
-        pwm <= 100;
-        pwm += PWM_STEP_PERCENT
-    )
-    {
         
-
-
-        /*
-         * Set PWM.
-         */
-
-        fan_set_pwm(pwm);
-
-
-        /*
-         * Allow fan speed to stabilize
-         * before measurements begin.
-         */
-
-        vTaskDelay(
-            pdMS_TO_TICKS(3000)
+        printf(
+            "\nPWM_Percent,Sample,RPM\n"
         );
 
 
-        float rpm_sum = 0.0f;
-
-
         /*
-         * Take 20 measurements.
-         */
+        * Sweep from 0% to 100%.
+        */
 
         for (
-            int sample = 1;
-            sample <= NUM_SAMPLES;
-            sample++
+            uint8_t pwm = 0;
+            pwm <= 100;
+            pwm += PWM_STEP_PERCENT
         )
         {
-            float rpm =
-                measure_rpm();
-
-
-            rpm_sum += rpm;
+            
 
 
             /*
-             * Output individual sample.
-             *
-             * This can be copied directly
-             * into Excel.
-             */
+            * Set PWM.
+            */
 
-            printf(
-                "%d,%d,%.2f\n",
-                pwm,
-                sample,
-                rpm
+            fan_set_pwm(pwm);
+
+
+            /*
+            * Allow fan speed to stabilize
+            * before measurements begin.
+            */
+
+            vTaskDelay(
+                pdMS_TO_TICKS(500)
             );
+
+
+
+
+            /*
+            * Take 20 measurements.
+            */
+
+            for (
+                int sample = 1;
+                sample <= NUM_SAMPLES;
+                sample++
+            )
+            {
+                float rpm =
+                    measure_rpm();
+
+
+                
+
+
+                /*
+                * Output individual sample.
+                *
+                * This can be copied directly
+                * into Excel.
+                */
+
+                printf(
+                    "%d,%d,%.2f\n",
+                    pwm,
+                    sample,
+                    rpm
+                );
+            }
+
         }
-
-
         /*
          * Calculate average RPM.
          */
 
-        float average_rpm =
-            rpm_sum /
-            (float)NUM_SAMPLES;
+        
 
 
         /*

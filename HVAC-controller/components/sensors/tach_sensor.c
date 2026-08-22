@@ -1,100 +1,180 @@
 #include "tach_sensor.h"
-#include "hvac_states.h"
-#include "driver/gpio.h"
-#include "driver/pulse_cnt.h"
+
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 
 static const char *TAG = "TACH_SENSOR";
 
-extern QueueHandle_t hvac_queue;
+static pcnt_unit_handle_t pcnt_unit = NULL;
+static pcnt_channel_handle_t pcnt_channel = NULL;
 
-// Global struct instances for linker resolution
-TachSensor tach_sensor = {0};
+uint32_t g_latest_rpm = 0.0f;
 
-// Global PCNT handle for sensor_manager start/stop control
-pcnt_unit_handle_t pcnt_unit = NULL;
 
-static bool s_fan_ok_sent = false; // State flag to avoid queue flooding
+/* ============================================================
+ * Initialization
+ * ============================================================ */
 
-void tach_sensor_init(struct TachSensor* self) {
-    if (!self) return;
+esp_err_t tach_sensor_init(void)
+{
+    /* Create PCNT unit */
 
-    self->init = tach_sensor_init;
-    self->read = tach_sensor_read;
-    self->fan_rpm = 0;
+    pcnt_unit_config_t unit_config = {
+        .high_limit = PCNT_HIGH_LIMIT,
+        .low_limit = PCNT_LOW_LIMIT
+    };
 
-    // Prevent re-initialization memory leak
-    if (self->pcnt_unit != NULL) {
-        ESP_LOGW(TAG, "Tachometer PCNT unit already initialized.");
-        return;
+    esp_err_t err =
+        pcnt_new_unit(
+            &unit_config,
+            &pcnt_unit
+        );
+
+    if (err != ESP_OK) {
+        ESP_LOGE(
+            TAG,
+            "Failed to create PCNT unit"
+        );
+
+        return err;
     }
 
-    // Configure Pulse Counter (PCNT) Unit
-    pcnt_unit_config_t unit_config = {
-        .high_limit = 10000,
-        .low_limit  = -1,
+
+    /* Create PCNT channel */
+
+    pcnt_chan_config_t channel_config = {
+        .edge_gpio_num = TACH_GPIO_PIN,
+        .level_gpio_num = -1
     };
-    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config, &self->pcnt_unit));
 
-    // Store in global handle for sensor_manager compatibility
-    pcnt_unit = self->pcnt_unit;
+    err =
+        pcnt_new_channel(
+            pcnt_unit,
+            &channel_config,
+            &pcnt_channel
+        );
 
-    // Glitch Filter (Suppress high-frequency noise on tach wire)
-    pcnt_glitch_filter_config_t filter_config = {
-        .max_glitch_ns = 1000,
-    };
-    ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(self->pcnt_unit, &filter_config));
+    if (err != ESP_OK) {
 
-    // Configure Channel
-    pcnt_chan_config_t chan_config = {
-        .edge_gpio_num  = FAN_TACH_PIN,
-        .level_gpio_num = -1,
-    };
-    ESP_ERROR_CHECK(pcnt_new_channel(self->pcnt_unit, &chan_config, &self->pcnt_chan));
+        ESP_LOGE(
+            TAG,
+            "Failed to create PCNT channel"
+        );
 
-    // Enable internal pull-up on Tach input GPIO
-    gpio_set_pull_mode(FAN_TACH_PIN, GPIO_PULLUP_ONLY);
+        pcnt_del_unit(pcnt_unit);
+        pcnt_unit = NULL;
 
-    // Count on rising edge
-    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(
-        self->pcnt_chan, 
-        PCNT_CHANNEL_EDGE_ACTION_INCREASE, 
-        PCNT_CHANNEL_EDGE_ACTION_HOLD
-    ));
+        return err;
+    }
 
-    ESP_ERROR_CHECK(pcnt_unit_enable(self->pcnt_unit));
-    ESP_ERROR_CHECK(pcnt_unit_clear_count(self->pcnt_unit));
-    
-    s_fan_ok_sent = false;
-    ESP_LOGI(TAG, "Tachometer Pulse Counter initialized on GPIO %d.", FAN_TACH_PIN);
+
+    /* Count rising edges */
+
+    err =
+        pcnt_channel_set_edge_action(
+            pcnt_channel,
+            PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+            PCNT_CHANNEL_EDGE_ACTION_HOLD
+        );
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+
+    /* Enable */
+
+    err = pcnt_unit_enable(pcnt_unit);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+
+    err = pcnt_unit_clear_count(pcnt_unit);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+
+    err = pcnt_unit_start(pcnt_unit);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+
+    ESP_LOGI(
+        TAG,
+        "Tachometer initialized on GPIO %d",
+        TACH_GPIO_PIN
+    );
+
+    return ESP_OK;
 }
 
 
-void tach_sensor_read(struct TachSensor* self) {
-    if (!self || !self->pcnt_unit) return;
+/* ============================================================
+ * RPM Measurement
+ * ============================================================ */
 
-    int pulse_count = 0;
-    ESP_ERROR_CHECK(pcnt_unit_get_count(self->pcnt_unit, &pulse_count));
-    ESP_ERROR_CHECK(pcnt_unit_clear_count(self->pcnt_unit)); // Reset counter for next window
-
-    // Calculate RPM: RPM = (Pulses / Pulses_Per_Rev) * (60s / Sample_Period_s)
-    float pulses_per_second = (float)pulse_count * (1000.0f / (float)DEFAULT_SAMPLE_PERIOD_MS);
-    uint32_t rpm = (uint32_t)((pulses_per_second / (float)PULSES_PER_REV) * 60.0f);
-    
-    self->fan_rpm = rpm;
-    ESP_LOGD(TAG, "Current Fan Speed: %u RPM (Pulses: %d)", self->fan_rpm, pulse_count);
-
-    // Trigger state machine once when fan reaches required airflow speed
-    if (self->fan_rpm >= 4000) {
-        if (!s_fan_ok_sent) {
-            hvac_cmd_t cmd = CMD_FAN_OK;
-            if (hvac_queue != NULL && xQueueSend(hvac_queue, &cmd, pdMS_TO_TICKS(10)) == pdPASS) {
-                s_fan_ok_sent = true; // Block duplicate commands until speed drops below threshold
-            }
-        }
-    } else {
-        s_fan_ok_sent = false; // Reset threshold trigger
+uint32_t get_tach_sensor_rpm(void)
+{
+    if (pcnt_unit == NULL) {
+        return 0.0f;
     }
+
+    int count = 0;
+
+    esp_err_t err =
+        pcnt_unit_get_count(
+            pcnt_unit,
+            &count
+        );
+
+    if (err != ESP_OK) {
+
+        ESP_LOGE(
+            TAG,
+            "Failed to read PCNT"
+        );
+
+        return 0.0f;
+    }
+
+
+    /*
+     * This function is intended to be called
+     * once every RPM_SAMPLE_TIME_MS.
+     *
+     * RPM =
+     *
+     * pulses
+     * -------------------- × 60
+     * sample_time_seconds × pulses_per_rev
+     */
+
+    float sample_time_seconds =
+        RPM_SAMPLE_TIME_MS / 1000.0f;
+
+
+    g_latest_rpm =
+        ((float)count /
+        (sample_time_seconds *
+         TACH_PULSES_PER_REV)) * 60.0f;
+
+
+    /* Reset counter for next measurement */
+
+    pcnt_unit_clear_count(pcnt_unit);
+
+
+    ESP_LOGD(
+        TAG,
+        "Tach count=%d RPM=%.1f",
+        count,
+        g_latest_rpm
+    );
+
+    return (uint32_t)g_latest_rpm;
 }

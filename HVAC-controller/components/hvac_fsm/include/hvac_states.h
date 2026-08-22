@@ -1,39 +1,54 @@
 #ifndef HVAC_STATES_H
 #define HVAC_STATES_H
 
-// State machine blocks
+#include <stdint.h>
+#include <stdbool.h>
+
+
+/* ============================================================
+ * HVAC STATES
+ * ============================================================ */
+
+
 typedef enum {
     STATE_IDLE = 0,
-    STATE_WAIT_DELAY,       
     STATE_FAN_CIRCULATE,
     STATE_IGNITION,
     STATE_WARMUP,
     STATE_VERIFY_RPM,
     STATE_RUNNING,
-    STATE_FAULT,
+    STATE_COOLDOWN, // Added
+    STATE_FAULT
 } hvac_state_t;
 
-// State machine events
 typedef enum {
     CMD_OFF = 0,
-    CMD_ON,
+    CMD_HEAT,
+    CMD_HEAT_OFF,
     CMD_FAN_ON,
     CMD_FAN_AUTO,
-    CMD_HEAT,
-
     CMD_FLAME_DETECTED,
     CMD_FLAME_TIMEOUT,
-    CMD_FAN_OK,
     CMD_WARMUP_DONE,
+    CMD_FAN_OK,
     CMD_TACH_TIMEOUT,
-    CMD_STATE_DELAY_COMPLETE
+    CMD_COOLDOWN_DONE // Added
 } hvac_cmd_t;
+/* ============================================================
+ * HVAC FAULTS
+ * ============================================================ */
 
-// Fault flag
 typedef enum {
-    FLT_NONE = 0,            
+
+    FLT_NONE = 0,
+
     FLT_FLAME,
-    FLT_FAN
+
+    FLT_FAN,
+
+    FLT_SAFETY
+
 } hvac_flt_t;
 
-#endif // HVAC_STATES_H
+
+#endif
